@@ -1,0 +1,20 @@
+{
+  "name": "weather-data-app",
+  "packageManager": "yarn@4.11.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently 'yarn dev:backend' 'yarn dev:frontend'",
+    "dev:backend": "yarn workspace backend dev",
+    "dev:frontend": "yarn workspace frontend dev",
+    "build": "yarn workspaces foreach --all -pt run build",
+    "start": "yarn workspaces foreach --all -pt run start",
+    "start:backend": "yarn workspace backend start",
+    "start:frontend": "yarn workspace frontend start"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
