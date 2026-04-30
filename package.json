@@ -4,17 +4,25 @@
   "private": true,
   "scripts": {
     "dev": "concurrently 'yarn dev:backend' 'yarn dev:frontend'",
-    "dev:backend": "yarn workspace backend dev",
-    "dev:frontend": "yarn workspace frontend dev",
+    "dev:backend": "yarn workspace @weather-data-app/backend dev",
+    "dev:frontend": "yarn workspace @weather-data-app/frontend dev",
+    "dev:worker": "yarn workspace @weather-data-app/worker dev",
     "build": "yarn workspaces foreach --all -pt run build",
     "start": "yarn workspaces foreach --all -pt run start",
-    "start:backend": "yarn workspace backend start",
-    "start:frontend": "yarn workspace frontend start"
+    "start:backend": "yarn workspace @weather-data-app/backend start",
+    "start:frontend": "yarn workspace @weather-data-app/frontend start",
+    "start:worker": "yarn workspace @weather-data-app/worker start",
+    "ingest:weather": "yarn workspace @weather-data-app/worker ingest",
+    "db:generate": "yarn workspace @weather-data-app/database prisma:generate",
+    "db:migrate:dev": "yarn workspace @weather-data-app/database prisma:migrate:dev"
   },
   "workspaces": [
     "packages/*"
   ],
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
   }
 }

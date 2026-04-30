@@ -43,6 +43,7 @@ Your primary job is to automatically apply the project skills before coding:
 - Preserve existing architecture and coding style unless explicitly asked to refactor.
 - Validate with available tests, linting, or type checks when practical.
 - Do not introduce unrelated file churn.
+- Use domain-first file structuring
 
 ## Workflow
 

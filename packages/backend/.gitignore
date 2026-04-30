@@ -16,3 +16,4 @@ dist
 
 #!.yarn/cache
 .pnp.*
+.env

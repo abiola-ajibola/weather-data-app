@@ -1,17 +1,39 @@
-import Fastify from 'fastify'
+import { buildApp } from './app.js'
+import { env } from './config/env.js'
 
-const fastify = Fastify({ logger: true })
+const app = buildApp()
+let isClosing = false
 
-const port = Number(process.env.PORT ?? 3001)
-const host = process.env.HOST ?? '0.0.0.0'
+const closeServer = async (signal: NodeJS.Signals): Promise<void> => {
+  if (isClosing) {
+    return
+  }
 
-fastify.get('/health', async () => ({ status: 'ok' }))
+  isClosing = true
+  app.log.info({ signal }, 'Received shutdown signal')
 
-const start = async () => {
   try {
-    await fastify.listen({ port, host })
+    await app.close()
+    process.exit(0)
   } catch (error) {
-    fastify.log.error(error)
+    app.log.error(error, 'Failed during shutdown')
+    process.exit(1)
+  }
+}
+
+process.on('SIGINT', () => {
+  void closeServer('SIGINT')
+})
+
+process.on('SIGTERM', () => {
+  void closeServer('SIGTERM')
+})
+
+const start = async (): Promise<void> => {
+  try {
+    await app.listen({ port: env.port, host: env.host })
+  } catch (error) {
+    app.log.error(error, 'Failed to start server')
     process.exit(1)
   }
 }

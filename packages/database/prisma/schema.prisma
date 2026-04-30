@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model WeatherStation {
+  stationId   String               @id
+  name        String
+  regionCode  String
+  latitude    Float
+  longitude   Float
+  elevationM  Float
+  observations WeatherObservation[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([regionCode])
+  @@index([name])
+}
+
+model WeatherObservation {
+  id              BigInt        @id @default(autoincrement())
+  stationId       String
+  date            DateTime      @db.Date
+  precipitationMm Float?
+  tempAvgC        Float?
+  tempMaxC        Float?
+  tempMinC        Float?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  station         WeatherStation @relation(fields: [stationId], references: [stationId], onDelete: Cascade)
+
+  @@unique([stationId, date])
+  @@index([date])
+}

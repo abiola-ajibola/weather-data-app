@@ -1,15 +1,19 @@
 {
-  "name": "backend",
+  "name": "@weather-data-app/backend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "dev": "yarn workspace @weather-data-app/database build && tsx --watch src/index.ts",
+    "build": "yarn workspace @weather-data-app/database build && tsc -p tsconfig.json",
+    "start": "yarn workspace @weather-data-app/database build && node dist/index.js"
   },
   "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/env": "^6.0.0",
+    "@weather-data-app/database": "workspace:*",
+    "dotenv": "^17.4.2",
     "fastify": "^5.8.5"
   },
   "devDependencies": {
