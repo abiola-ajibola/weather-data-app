@@ -14,12 +14,11 @@
     "start": "node -e \"console.log('Database workspace has no runtime server')\""
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0"
+    "@prisma/client": "^6"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
-    "prisma": "^7.8.0",
+    "prisma": "^6",
     "typescript": "^6.0.3"
   }
 }
