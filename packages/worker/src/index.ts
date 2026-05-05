@@ -1,202 +1,275 @@
-import { createReadStream } from 'node:fs'
-import { readdir } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
-import { pipeline } from 'node:stream/promises'
-import { fileURLToPath } from 'node:url'
+import { createReadStream } from "node:fs";
+import { readdir } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { pipeline } from "node:stream/promises";
+import { fileURLToPath } from "node:url";
+import { createGunzip } from "node:zlib";
+import { extract } from "tar-stream";
 
-import { prisma } from '@weather-data-app/database'
-import { parse } from 'csv-parse'
+import { prisma } from "@weather-data-app/database";
+import { parse } from "csv-parse";
+import { get } from "node:https";
 
 type CsvRow = {
-  STATION?: string
-  DATE?: string
-  LATITUDE?: string
-  LONGITUDE?: string
-  ELEVATION?: string
-  NAME?: string
-  PRCP?: string
-  TAVG?: string
-  TMAX?: string
-  TMIN?: string
-}
+  STATION?: string;
+  DATE?: string;
+  LATITUDE?: string;
+  LONGITUDE?: string;
+  ELEVATION?: string;
+  NAME?: string;
+  PRCP?: string;
+  PRCP_ATTRIBUTES?: string;
+  TAVG?: string;
+  TAVG_ATTRIBUTES?: string;
+  TMAX?: string;
+  TMAX_ATTRIBUTES?: string;
+  TMIN?: string;
+  TMIN_ATTRIBUTES?: string;
+  DAPR?: string;
+  DAPR_ATTRIBUTES?: string;
+  DATN?: string;
+  DATN_ATTRIBUTES?: string;
+  DATX?: string;
+  DATX_ATTRIBUTES?: string;
+  DWPR?: string;
+  DWPR_ATTRIBUTES?: string;
+  MDPR?: string;
+  MDPR_ATTRIBUTES?: string;
+  MDTN?: string;
+  MDTN_ATTRIBUTES?: string;
+  MDTX?: string;
+  MDTX_ATTRIBUTES?: string;
+};
 
 type StationPayload = {
-  stationId: string
-  name: string
-  regionCode: string
-  latitude: number
-  longitude: number
-  elevationM: number
-}
+  stationId: string;
+  name: string;
+  regionCode: string;
+  latitude: number;
+  longitude: number;
+  elevationM: number;
+};
 
 type ObservationPayload = {
-  stationId: string
-  date: Date
-  precipitationMm: number | null
-  tempAvgC: number | null
-  tempMaxC: number | null
-  tempMinC: number | null
-}
+  stationId: string;
+  stationName: string;
+  date: Date;
+  latitude: number;
+  longitude: number;
+  elevationM: number;
+  prcp: number | null;
+  prcpAttributes: string[];
+  tavg: number | null;
+  tavgAttributes: string[];
+  tmax: number | null;
+  tmaxAttributes: string[];
+  tmin: number | null;
+  tminAttributes: string[];
+  dapr: number | null;
+  daprAttributes: string[];
+  datn: number | null;
+  datnAttributes: string[];
+  datx: number | null;
+  datxAttributes: string[];
+  dwpr: number | null;
+  dwprAttributes: string[];
+  mdpr: number | null;
+  mdprAttributes: string[];
+  mdtn: number | null;
+  mdtnAttributes: string[];
+  mdtx: number | null;
+  mdtxAttributes: string[];
+};
 
-const sourceDirectory = dirname(fileURLToPath(import.meta.url))
-const datasetDirectory =
-  process.env.WEATHER_DATASET_DIR ??
-  resolve(sourceDirectory, '../../../sample-dataset')
-const createManyChunkSize = 2000
+// const sourceDirectory = dirname(fileURLToPath(import.meta.url));
+// const datasetDirectory =
+//   process.env.WEATHER_DATASET_DIR ??
+//   resolve(sourceDirectory, "../../../sample-dataset");
+// const createManyChunkSize = 2000;
 
 const toNumber = (value: string | undefined): number => {
-  const parsed = Number(value?.trim())
-  return Number.isFinite(parsed) ? parsed : 0
-}
+  const parsed = Number(value?.trim());
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 const toScaledNumber = (value: string | undefined): number | null => {
-  const normalizedValue = value?.trim()
+  const normalizedValue = value?.trim();
 
   if (!normalizedValue) {
-    return null
+    return null;
   }
 
-  const parsed = Number(normalizedValue)
+  const parsed = Number(normalizedValue);
 
   if (!Number.isFinite(parsed)) {
-    return null
+    return null;
   }
 
-  return Math.round(parsed) / 10
-}
+  return Math.round(parsed) / 10;
+};
+
+const toInteger = (value: string | undefined): number | null => {
+  const normalizedValue = value?.trim();
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const parsed = Number(normalizedValue);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return Math.round(parsed);
+};
+
+const toAttribute = (value: string | undefined): string[] => {
+  const normalizedValue = value?.trim();
+  return normalizedValue ? normalizedValue.split(",") : [];
+};
 
 const toDate = (value: string | undefined): Date => {
   if (!value) {
-    throw new Error('Missing DATE column value in CSV row')
+    throw new Error("Missing DATE column value in CSV row");
   }
 
-  return new Date(`${value}T00:00:00.000Z`)
-}
+  return new Date(`${value}T00:00:00.000Z`);
+};
 
 const extractRegionCode = (stationName: string): string => {
-  const parts = stationName.split(',').map((part) => part.trim())
-  return parts.length > 1 ? parts[parts.length - 1] : 'Unknown'
-}
+  const parts = stationName.split(",").map((part) => part.trim());
+  return parts.length > 1 ? parts[parts.length - 1] : "Unknown";
+};
 
-const splitIntoChunks = <T>(items: T[], size: number): T[][] => {
-  const chunks: T[][] = []
+// const splitIntoChunks = <T>(items: T[], size: number): T[][] => {
+//   const chunks: T[][] = [];
 
-  for (let index = 0; index < items.length; index += size) {
-    chunks.push(items.slice(index, index + size))
-  }
+//   for (let index = 0; index < items.length; index += size) {
+//     chunks.push(items.slice(index, index + size));
+//   }
 
-  return chunks
-}
+//   return chunks;
+// };
 
-const ingestStationFile = async (filePath: string): Promise<void> => {
-  const stationPayloads: StationPayload[] = []
-  const observations: ObservationPayload[] = []
+const controller = new AbortController();
 
-  await pipeline(
-    createReadStream(filePath),
-    parse({
+const ingestStationFile = async (
+  sourceUrl: string = "https://www.ncei.noaa.gov/data/daily-summaries/archive/daily-summaries-latest.tar.gz",
+): Promise<void> => {
+  const gunzip = createGunzip();
+  const extractor = extract();
+
+  extractor.on("entry", async (headers, stream, next) => {
+    console.log("entry");
+    console.log(headers.name)
+    const parser = parse({
       columns: true,
       skip_empty_lines: true,
       trim: true,
-    }),
-    async function* normalizeRows(
-      source: AsyncIterable<CsvRow>,
-    ): AsyncGenerator<ObservationPayload> {
-      for await (const row of source) {
-        const stationId = row.STATION?.trim()
-        const stationName = row.NAME?.trim()
+      autoParse: true,
+    });
 
-        if (!stationId || !stationName) {
-          continue
-        }
-
-        if (stationPayloads.length === 0) {
-          stationPayloads.push({
-            stationId,
-            name: stationName,
-            regionCode: extractRegionCode(stationName),
-            latitude: toNumber(row.LATITUDE),
-            longitude: toNumber(row.LONGITUDE),
-            elevationM: toNumber(row.ELEVATION),
-          })
-        }
-
-        yield {
+    parser.on("data", async (row: CsvRow) => {
+      const year = Number(row.DATE?.slice(0, 4));
+      const MIN_YEAR = 2026;
+      const month = Number(row.DATE?.slice(5, 7));
+      if (year == MIN_YEAR && month == 5) {
+        const stationId = row.STATION?.trim() || "";
+        const stationName = row.NAME?.trim() || "";
+        const station: StationPayload = {
           stationId,
+          name: stationName,
+          regionCode: extractRegionCode(stationName),
+          latitude: toNumber(row.LATITUDE),
+          longitude: toNumber(row.LONGITUDE),
+          elevationM: toNumber(row.ELEVATION),
+        };
+        const data: ObservationPayload = {
+          stationId,
+          stationName,
           date: toDate(row.DATE),
-          precipitationMm: toScaledNumber(row.PRCP),
-          tempAvgC: toScaledNumber(row.TAVG),
-          tempMaxC: toScaledNumber(row.TMAX),
-          tempMinC: toScaledNumber(row.TMIN),
+          latitude: toNumber(row.LATITUDE),
+          longitude: toNumber(row.LONGITUDE),
+          elevationM: toNumber(row.ELEVATION),
+          prcp: toScaledNumber(row.PRCP),
+          prcpAttributes: toAttribute(row.PRCP_ATTRIBUTES),
+          tavg: toScaledNumber(row.TAVG),
+          tavgAttributes: toAttribute(row.TAVG_ATTRIBUTES),
+          tmax: toScaledNumber(row.TMAX),
+          tmaxAttributes: toAttribute(row.TMAX_ATTRIBUTES),
+          tmin: toScaledNumber(row.TMIN),
+          tminAttributes: toAttribute(row.TMIN_ATTRIBUTES),
+          dapr: toInteger(row.DAPR),
+          daprAttributes: toAttribute(row.DAPR_ATTRIBUTES),
+          datn: toScaledNumber(row.DATN),
+          datnAttributes: toAttribute(row.DATN_ATTRIBUTES),
+          datx: toScaledNumber(row.DATX),
+          datxAttributes: toAttribute(row.DATX_ATTRIBUTES),
+          dwpr: toInteger(row.DWPR),
+          dwprAttributes: toAttribute(row.DWPR_ATTRIBUTES),
+          mdpr: toScaledNumber(row.MDPR),
+          mdprAttributes: toAttribute(row.MDPR_ATTRIBUTES),
+          mdtn: toScaledNumber(row.MDTN),
+          mdtnAttributes: toAttribute(row.MDTN_ATTRIBUTES),
+          mdtx: toScaledNumber(row.MDTX),
+          mdtxAttributes: toAttribute(row.MDTX_ATTRIBUTES),
+        };
+
+        await prisma.weatherStation.upsert({
+          where: {
+            stationId: station.stationId,
+          },
+          create: station,
+          update: {
+            name: station.name,
+            regionCode: station.regionCode,
+            latitude: station.latitude,
+            longitude: station.longitude,
+            elevationM: station.elevationM,
+          },
+        });
+
+        await prisma.weatherObservation.upsert({
+          where: {
+            stationId_date: { stationId: station.stationId, date: data.date },
+          },
+          create: data,
+          update: data,
+        });
+        if (data.date.getDate() >= 31) {
+          controller.abort();
         }
       }
+    });
+
+    parser.on("error", function (err) {
+      console.log({ err });
+    });
+    stream.on("error", (err) => next(err));
+    stream.on("data", async (chunk: Buffer) => {
+      parser.write(chunk);
+    });
+    stream.on("end", () => {
+      next();
+    });
+  });
+
+  get(
+    new URL(sourceUrl),
+    {
+      method: "GET",
+      signal: controller.signal,
     },
-    async function collectRows(source: AsyncIterable<ObservationPayload>) {
-      for await (const observation of source) {
-        observations.push(observation)
+    async (res) => {
+      try {
+        await pipeline(res, gunzip, extractor);
+      } catch (error) {
+        console.log({ error });
       }
     },
-  )
+  );
+};
 
-  const station = stationPayloads[0]
-
-  if (!station) {
-    return
-  }
-
-  await prisma.$transaction(async (transaction) => {
-    await transaction.weatherStation.upsert({
-      where: {
-        stationId: station.stationId,
-      },
-      create: station,
-      update: {
-        name: station.name,
-        regionCode: station.regionCode,
-        latitude: station.latitude,
-        longitude: station.longitude,
-        elevationM: station.elevationM,
-      },
-    })
-
-    await transaction.weatherObservation.deleteMany({
-      where: {
-        stationId: station.stationId,
-      },
-    })
-
-    for (const chunk of splitIntoChunks(observations, createManyChunkSize)) {
-      await transaction.weatherObservation.createMany({
-        data: chunk,
-      })
-    }
-  })
-
-  console.log(
-    `Ingested ${observations.length} observations for station ${station.stationId}`,
-  )
-}
-
-const run = async (): Promise<void> => {
-  const files = (await readdir(datasetDirectory))
-    .filter((fileName) => fileName.endsWith('.csv'))
-    .sort((left, right) => left.localeCompare(right))
-
-  if (files.length === 0) {
-    throw new Error(`No CSV files found in ${datasetDirectory}`)
-  }
-
-  for (const fileName of files) {
-    const filePath = join(datasetDirectory, fileName)
-    await ingestStationFile(filePath)
-  }
-
-  await prisma.$disconnect()
-  console.log('Weather ingestion completed successfully.')
-}
-
-run().catch(async (error) => {
-  console.error(error)
-  await prisma.$disconnect()
-  process.exit(1)
-})
+ingestStationFile()
+  .catch(console.trace)
+  .finally(async () => await prisma.$disconnect());

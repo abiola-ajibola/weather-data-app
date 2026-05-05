@@ -1,0 +1,93 @@
+generator client {
+    provider = "prisma-client-js"
+    output   = "../generated/client"
+}
+
+datasource db {
+    provider = "mongodb"
+    url      = env("DATABASE_URL")
+}
+
+model WeatherStation {
+    id         String    @id @default(auto()) @map("_id") @db.ObjectId
+    stationId  String    @unique
+    name       String
+    regionCode String?
+    latitude   Float?
+    longitude  Float?
+    elevationM Float?
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+    deletedAt  DateTime?
+
+    @@index([name])
+    @@index([regionCode])
+    @@map("weather_stations")
+}
+
+model WeatherObservation {
+    id             String    @id @default(auto()) @map("_id") @db.ObjectId
+    stationId      String
+    stationName    String
+    date           DateTime
+    latitude       Float?
+    longitude      Float?
+    elevationM     Float?
+    prcp           Float?
+    prcpAttributes String[]
+    tmax           Float?
+    tmaxAttributes String[]
+    tmin           Float?
+    tminAttributes String[]
+    dapr           Int?
+    daprAttributes String[]
+    datn           Float?
+    datnAttributes String[]
+    datx           Float?
+    datxAttributes String[]
+    dwpr           Int?
+    dwprAttributes String[]
+    mdpr           Float?
+    mdprAttributes String[]
+    mdtn           Float?
+    mdtnAttributes String[]
+    mdtx           Float?
+    mdtxAttributes String[]
+    tavg           Float?
+    tavgAttributes String[]
+    createdAt      DateTime  @default(now())
+    updatedAt      DateTime  @updatedAt
+    deletedAt      DateTime?
+
+    @@unique([stationId, date])
+    @@index([date])
+    @@index([stationName])
+    @@map("weather_observations")
+}
+
+model ApiKey {
+    id         String    @id @default(auto()) @map("_id") @db.ObjectId
+    email      String
+    label      String
+    keyPrefix  String
+    keyHash    String    @unique
+    createdAt  DateTime  @default(now())
+    lastUsedAt DateTime?
+    revokedAt  DateTime?
+
+    @@index([email])
+    @@index([revokedAt])
+    @@map("api_keys")
+}
+
+model MagicLinkToken {
+    id         String    @id @default(auto()) @map("_id") @db.ObjectId
+    email      String
+    tokenHash  String    @unique
+    expiresAt  DateTime
+    consumedAt DateTime?
+    createdAt  DateTime  @default(now())
+
+    @@index([email, expiresAt])
+    @@map("magic_link_tokens")
+}
