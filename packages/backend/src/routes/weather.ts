@@ -123,7 +123,7 @@ const getDashboardRows = async (
 
   const observations = await prisma.weatherObservation.findMany({
     where: {
-      deletedAt: null,
+      OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
       date: {
         gte: startDate,
       },
@@ -146,7 +146,7 @@ export const registerWeatherRoutes = async (
     const observation = await prisma.weatherObservation.findFirst({
       where: {
         id,
-        deletedAt: null,
+        OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
       },
     });
 
@@ -341,7 +341,7 @@ export const registerWeatherRoutes = async (
         await prisma.weatherObservation.findMany({
           where: {
             stationId,
-            deletedAt: null,
+            OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
             date: {
               gte: new Date("2020-01-01T00:00:00.000Z"),
             },
