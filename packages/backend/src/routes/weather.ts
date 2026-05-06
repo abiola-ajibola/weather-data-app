@@ -4,14 +4,11 @@ import { prisma, Prisma } from "@weather-data-app/database";
 
 import { getCachedJson, setCachedJson } from "../lib/cache.js";
 import {
-  applyFilters,
-  applySort,
   classifyCondition,
   dashboardRanges,
   FilterOperator,
   getRangeStart,
   numericFields,
-  paginate,
   parseFilters,
   stringFields,
   toNumeric,
@@ -160,7 +157,8 @@ const mapStringOperator = (operator: FilterOperator) => {
   }
 };
 
-const getDashboardRows = async ({
+const getWeatherObservation = async ({
+  where,
   range,
   filters,
   sortBy,
@@ -168,6 +166,7 @@ const getDashboardRows = async ({
   page,
   pageSize,
 }: {
+  where?: Prisma.WeatherObservationWhereInput;
   range?: DashboardRange;
   filters?: WeatherFilter[];
   sortBy: keyof WeatherObservationRow;
@@ -226,7 +225,7 @@ const getDashboardRows = async ({
     }
   }
 
-  const where: Prisma.WeatherObservationWhereInput = {
+  const whereClause: Prisma.WeatherObservationWhereInput = {
     OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
     ...(startDate
       ? {
@@ -236,6 +235,7 @@ const getDashboardRows = async ({
         }
       : {}),
     AND: andFilter,
+    ...where,
   };
 
   const orderBy = sortBy
@@ -246,7 +246,7 @@ const getDashboardRows = async ({
 
   const [observations, count] = await Promise.all([
     prisma.weatherObservation.findMany({
-      where,
+      where: whereClause,
       orderBy,
       take: pageSize,
       skip: (page < 1 ? 0 : page - 1) * pageSize,
@@ -319,7 +319,7 @@ export const registerWeatherRoutes = async (
         return cached;
       }
 
-      const { rows, total } = await getDashboardRows({
+      const { rows, total } = await getWeatherObservation({
         range,
         filters,
         sortBy,
@@ -465,32 +465,32 @@ export const registerWeatherRoutes = async (
       const sortDirection = query.sortDirection === "asc" ? "asc" : "desc";
       const filters = parseFilters(query.filters);
 
-      const rows = (
-        await prisma.weatherObservation.findMany({
-          where: {
-            stationId,
-            OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
-            date: {
-              gte: new Date("2020-01-01T00:00:00.000Z"),
-            },
-          },
-          orderBy: {
-            date: "desc",
-          },
-          take: 20_000,
-        })
-      ).map(toObservationRow);
+      const cacheKey = `observations:${stationId}:${sortBy}:${sortDirection}:${page}:${pageSize}:${query.filters ?? ""}`;
+      const cached = await getCachedJson<unknown>(cacheKey);
+      if (cached) {
+        return cached;
+      }
 
-      const filtered = applyFilters(rows, filters);
-      const sorted = applySort(filtered, sortBy, sortDirection);
-      const paged = paginate(sorted, page, pageSize);
+      const {
+        rows,
+        total,
+        page: currentPage,
+        pageSize: currentPageSize,
+      } = await getWeatherObservation({
+        where: { stationId },
+        filters,
+        sortBy,
+        sortDirection,
+        page,
+        pageSize,
+      });
 
       return {
         stationId,
-        rows: paged.rows,
-        totalRows: paged.total,
-        page: paged.page,
-        pageSize: paged.pageSize,
+        rows,
+        totalRows: total,
+        page: currentPage,
+        pageSize: currentPageSize,
       };
     },
   );
