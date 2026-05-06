@@ -81,11 +81,7 @@ type ObservationPayload = {
   mdtxAttributes: string[];
 };
 
-// const sourceDirectory = dirname(fileURLToPath(import.meta.url));
-// const datasetDirectory =
-//   process.env.WEATHER_DATASET_DIR ??
-//   resolve(sourceDirectory, "../../../sample-dataset");
-// const createManyChunkSize = 2000;
+type IngestArgs = { sourceUrl: string; startDate?: Date; endDate?: Date };
 
 const toNumber = (value: string | undefined): number => {
   const parsed = Number(value?.trim());
@@ -141,27 +137,21 @@ const extractRegionCode = (stationName: string): string => {
   return parts.length > 1 ? parts[parts.length - 1] : "Unknown";
 };
 
-// const splitIntoChunks = <T>(items: T[], size: number): T[][] => {
-//   const chunks: T[][] = [];
-
-//   for (let index = 0; index < items.length; index += size) {
-//     chunks.push(items.slice(index, index + size));
-//   }
-
-//   return chunks;
-// };
-
 const controller = new AbortController();
 
-const ingestStationFile = async (
-  sourceUrl: string = "https://www.ncei.noaa.gov/data/daily-summaries/archive/daily-summaries-latest.tar.gz",
-): Promise<void> => {
+const ingestStationFile = async ({
+  sourceUrl,
+  startDate,
+  endDate,
+}: IngestArgs): Promise<void> => {
   const gunzip = createGunzip();
   const extractor = extract();
-
+  const startTime = startDate?.getTime();
+  const endTime = endDate?.getTime();
+  
   extractor.on("entry", async (headers, stream, next) => {
     console.log("entry");
-    console.log(headers.name)
+    console.log(headers.name);
     const parser = parse({
       columns: true,
       skip_empty_lines: true,
@@ -170,10 +160,8 @@ const ingestStationFile = async (
     });
 
     parser.on("data", async (row: CsvRow) => {
-      const year = Number(row.DATE?.slice(0, 4));
-      const MIN_YEAR = 2026;
-      const month = Number(row.DATE?.slice(5, 7));
-      if (year == MIN_YEAR && month == 5) {
+      const time = row.DATE ? new Date(row.DATE).getTime() : 0;
+      if (time >= (startTime || 0) && time <= (endTime || Infinity)) {
         const stationId = row.STATION?.trim() || "";
         const stationName = row.NAME?.trim() || "";
         const station: StationPayload = {
@@ -270,6 +258,11 @@ const ingestStationFile = async (
   );
 };
 
-ingestStationFile()
+ingestStationFile({
+  sourceUrl:
+    "https://www.ncei.noaa.gov/data/daily-summaries/archive/daily-summaries-latest.tar.gz",
+  startDate: new Date("2026-05-03"),
+  endDate: new Date(""),
+})
   .catch(console.trace)
   .finally(async () => await prisma.$disconnect());

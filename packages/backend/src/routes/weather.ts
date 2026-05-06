@@ -129,7 +129,7 @@ const getDashboardRows = async (
       },
     },
     orderBy: {
-      date: "desc",
+      date: "asc",
     },
     take: 15_000,
   });

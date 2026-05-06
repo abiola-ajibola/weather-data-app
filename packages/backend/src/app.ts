@@ -83,8 +83,6 @@ export const buildApp = (): FastifyInstance => {
       },
     });
 
-    console.log({ keyHash, apiKey, token });
-
     if (!apiKey) {
       return reply.unauthorized("Invalid bearer token.");
     }
