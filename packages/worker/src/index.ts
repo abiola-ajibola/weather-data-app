@@ -148,7 +148,7 @@ const ingestStationFile = async ({
   const extractor = extract();
   const startTime = startDate?.getTime();
   const endTime = endDate?.getTime();
-  
+
   extractor.on("entry", async (headers, stream, next) => {
     console.log("entry");
     console.log(headers.name);
@@ -203,19 +203,14 @@ const ingestStationFile = async ({
           mdtxAttributes: toAttribute(row.MDTX_ATTRIBUTES),
         };
 
-        await prisma.weatherStation.upsert({
-          where: {
-            stationId: station.stationId,
-          },
-          create: station,
-          update: {
-            name: station.name,
-            regionCode: station.regionCode,
-            latitude: station.latitude,
-            longitude: station.longitude,
-            elevationM: station.elevationM,
-          },
+        const existingStation = await prisma.weatherStation.findUnique({
+          where: { stationId: station.stationId },
         });
+
+        if (!existingStation)
+          await prisma.weatherStation.create({
+            data: station,
+          });
 
         await prisma.weatherObservation.upsert({
           where: {
