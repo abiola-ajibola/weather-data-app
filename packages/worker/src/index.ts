@@ -160,68 +160,72 @@ const ingestStationFile = async ({
     });
 
     parser.on("data", async (row: CsvRow) => {
-      const time = row.DATE ? new Date(row.DATE).getTime() : 0;
-      if (time >= (startTime || 0) && time <= (endTime || Infinity)) {
-        const stationId = row.STATION?.trim() || "";
-        const stationName = row.NAME?.trim() || "";
-        const station: StationPayload = {
-          stationId,
-          name: stationName,
-          regionCode: extractRegionCode(stationName),
-          latitude: toNumber(row.LATITUDE),
-          longitude: toNumber(row.LONGITUDE),
-          elevationM: toNumber(row.ELEVATION),
-        };
-        const data: ObservationPayload = {
-          stationId,
-          stationName,
-          date: toDate(row.DATE),
-          latitude: toNumber(row.LATITUDE),
-          longitude: toNumber(row.LONGITUDE),
-          elevationM: toNumber(row.ELEVATION),
-          prcp: toScaledNumber(row.PRCP),
-          prcpAttributes: toAttribute(row.PRCP_ATTRIBUTES),
-          tavg: toScaledNumber(row.TAVG),
-          tavgAttributes: toAttribute(row.TAVG_ATTRIBUTES),
-          tmax: toScaledNumber(row.TMAX),
-          tmaxAttributes: toAttribute(row.TMAX_ATTRIBUTES),
-          tmin: toScaledNumber(row.TMIN),
-          tminAttributes: toAttribute(row.TMIN_ATTRIBUTES),
-          dapr: toInteger(row.DAPR),
-          daprAttributes: toAttribute(row.DAPR_ATTRIBUTES),
-          datn: toScaledNumber(row.DATN),
-          datnAttributes: toAttribute(row.DATN_ATTRIBUTES),
-          datx: toScaledNumber(row.DATX),
-          datxAttributes: toAttribute(row.DATX_ATTRIBUTES),
-          dwpr: toInteger(row.DWPR),
-          dwprAttributes: toAttribute(row.DWPR_ATTRIBUTES),
-          mdpr: toScaledNumber(row.MDPR),
-          mdprAttributes: toAttribute(row.MDPR_ATTRIBUTES),
-          mdtn: toScaledNumber(row.MDTN),
-          mdtnAttributes: toAttribute(row.MDTN_ATTRIBUTES),
-          mdtx: toScaledNumber(row.MDTX),
-          mdtxAttributes: toAttribute(row.MDTX_ATTRIBUTES),
-        };
+      try {
+        const time = row.DATE ? new Date(row.DATE).getTime() : 0;
+        if (time >= (startTime || 0) && time <= (endTime || Infinity)) {
+          const stationId = row.STATION?.trim() || "";
+          const stationName = row.NAME?.trim() || "";
+          const station: StationPayload = {
+            stationId,
+            name: stationName,
+            regionCode: extractRegionCode(stationName),
+            latitude: toNumber(row.LATITUDE),
+            longitude: toNumber(row.LONGITUDE),
+            elevationM: toNumber(row.ELEVATION),
+          };
+          const data: ObservationPayload = {
+            stationId,
+            stationName,
+            date: toDate(row.DATE),
+            latitude: toNumber(row.LATITUDE),
+            longitude: toNumber(row.LONGITUDE),
+            elevationM: toNumber(row.ELEVATION),
+            prcp: toScaledNumber(row.PRCP),
+            prcpAttributes: toAttribute(row.PRCP_ATTRIBUTES),
+            tavg: toScaledNumber(row.TAVG),
+            tavgAttributes: toAttribute(row.TAVG_ATTRIBUTES),
+            tmax: toScaledNumber(row.TMAX),
+            tmaxAttributes: toAttribute(row.TMAX_ATTRIBUTES),
+            tmin: toScaledNumber(row.TMIN),
+            tminAttributes: toAttribute(row.TMIN_ATTRIBUTES),
+            dapr: toInteger(row.DAPR),
+            daprAttributes: toAttribute(row.DAPR_ATTRIBUTES),
+            datn: toScaledNumber(row.DATN),
+            datnAttributes: toAttribute(row.DATN_ATTRIBUTES),
+            datx: toScaledNumber(row.DATX),
+            datxAttributes: toAttribute(row.DATX_ATTRIBUTES),
+            dwpr: toInteger(row.DWPR),
+            dwprAttributes: toAttribute(row.DWPR_ATTRIBUTES),
+            mdpr: toScaledNumber(row.MDPR),
+            mdprAttributes: toAttribute(row.MDPR_ATTRIBUTES),
+            mdtn: toScaledNumber(row.MDTN),
+            mdtnAttributes: toAttribute(row.MDTN_ATTRIBUTES),
+            mdtx: toScaledNumber(row.MDTX),
+            mdtxAttributes: toAttribute(row.MDTX_ATTRIBUTES),
+          };
 
-        const existingStation = await prisma.weatherStation.findUnique({
-          where: { stationId: station.stationId },
-        });
-
-        if (!existingStation)
-          await prisma.weatherStation.create({
-            data: station,
+          const existingStation = await prisma.weatherStation.findUnique({
+            where: { stationId: station.stationId },
           });
 
-        await prisma.weatherObservation.upsert({
-          where: {
-            stationId_date: { stationId: station.stationId, date: data.date },
-          },
-          create: data,
-          update: data,
-        });
-        // if (data.date.getDate() >= 31) {
-        //   controller.abort();
-        // }
+          if (!existingStation)
+            await prisma.weatherStation.create({
+              data: station,
+            });
+
+          await prisma.weatherObservation.upsert({
+            where: {
+              stationId_date: { stationId: station.stationId, date: data.date },
+            },
+            create: data,
+            update: data,
+          });
+          // if (data.date.getDate() >= 31) {
+          //   controller.abort();
+          // }
+        }
+      } catch (e) {
+        console.error(e);
       }
     });
 
