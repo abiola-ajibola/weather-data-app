@@ -9,7 +9,7 @@ import type {
   WeatherRowListOptions,
 } from './types'
 
-const apiBaseUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim() ||
+const apiBaseUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim() ??
   'http://localhost:3001'
 
 type ApiRequestOptions = {
