@@ -1,18 +1,11 @@
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import {
-  fetchApiKeys,
-  getApiKey,
-  requestMagicLink,
-  revokeApiKey,
-  setApiKey,
-  verifyMagicLink,
-} from '@/lib/api'
+import { createApiToken, requestMagicLink } from '@/lib/api'
 
 export const AuthPage = () => {
   const [searchParams] = useSearchParams()
@@ -21,6 +14,7 @@ export const AuthPage = () => {
   const [label, setLabel] = useState('My API key')
   const [requestMessage, setRequestMessage] = useState('')
   const [verifyMessage, setVerifyMessage] = useState('')
+  const [createdToken, setCreatedToken] = useState('')
 
   const requestLinkMutation = useMutation({
     mutationFn: requestMagicLink,
@@ -29,32 +23,17 @@ export const AuthPage = () => {
     },
   })
 
-  const verifyLinkMutation = useMutation({
+  const createTokenMutation = useMutation({
     mutationFn: ({
       verificationToken,
       keyLabel,
     }: {
       verificationToken: string
       keyLabel: string
-    }) => verifyMagicLink(verificationToken, keyLabel),
+    }) => createApiToken(verificationToken, keyLabel),
     onSuccess: (result) => {
-      setApiKey(result.apiKey)
-      setVerifyMessage('API key created and saved in your browser.')
-    },
-  })
-
-  const hasApiKey = getApiKey().length > 0
-
-  const apiKeysQuery = useQuery({
-    queryKey: ['api-keys'],
-    enabled: hasApiKey,
-    queryFn: fetchApiKeys,
-  })
-
-  const revokeMutation = useMutation({
-    mutationFn: revokeApiKey,
-    onSuccess: async () => {
-      await apiKeysQuery.refetch()
+      setCreatedToken(result.apiKey)
+      setVerifyMessage('Token created after email verification. Existing tokens for this email were revoked.')
     },
   })
 
@@ -64,7 +43,7 @@ export const AuthPage = () => {
         <CardHeader>
           <CardTitle>Request magic link</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Enter your email to receive a one-time passwordless sign-in link.
+            Enter your email to receive a one-time link for token generation.
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -88,9 +67,9 @@ export const AuthPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Verify token and create API key</CardTitle>
+          <CardTitle>Verify magic link and create token</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Paste your token from the email link and create a named API key.
+            Paste the token from your email link to create an API token.
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -106,67 +85,35 @@ export const AuthPage = () => {
           />
           <Button
             disabled={
-              verifyLinkMutation.isPending ||
+              createTokenMutation.isPending ||
               token.trim().length === 0 ||
               label.trim().length === 0
             }
             onClick={async () => {
-              await verifyLinkMutation.mutateAsync({
+              await createTokenMutation.mutateAsync({
                 verificationToken: token.trim(),
                 keyLabel: label.trim(),
               })
             }}
           >
-            {verifyLinkMutation.isPending ? 'Creating...' : 'Create API key'}
+            {createTokenMutation.isPending ? 'Creating...' : 'Create API token'}
           </Button>
           {verifyMessage ? <p className="text-sm text-primary">{verifyMessage}</p> : null}
-        </CardContent>
-      </Card>
-
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Existing API keys</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            API keys are scoped by email and can be revoked at any time.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {!hasApiKey ? (
-            <p className="text-sm text-muted-foreground">
-              Create and save an API key first to list or revoke keys.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {(apiKeysQuery.data?.items ?? []).map((key) => (
-                <div
-                  key={key.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-card/70 p-3"
-                >
-                  <div>
-                    <p className="font-semibold">{key.label}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {key.keyPrefix}... | Created {new Date(key.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <Button
-                    variant="danger"
-                    disabled={
-                      revokeMutation.isPending ||
-                      key.revokedAt !== null
-                    }
-                    onClick={async () => {
-                      await revokeMutation.mutateAsync(key.id)
-                    }}
-                  >
-                    {key.revokedAt ? 'Revoked' : 'Revoke'}
-                  </Button>
-                </div>
-              ))}
-              {(apiKeysQuery.data?.items ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">No keys found yet.</p>
-              ) : null}
+          {createdToken ? (
+            <div className="space-y-1">
+              <p className="text-xs font-semibold">Generated token</p>
+              <Input value={createdToken} readOnly />
+              <p className="text-xs text-muted-foreground">
+                Use this token in your proxy server configuration.
+              </p>
             </div>
-          )}
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            Creating a new token with the same email automatically revokes older active tokens.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Tokens are also revoked after 30 days of inactivity.
+          </p>
         </CardContent>
       </Card>
     </section>

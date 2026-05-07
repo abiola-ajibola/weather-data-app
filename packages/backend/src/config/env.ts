@@ -24,7 +24,7 @@ export const env = {
   redisUrl: process.env.REDIS_URL?.trim() || undefined,
   magicLinkBaseUrl:
     process.env.MAGIC_LINK_BASE_URL?.trim() ||
-    "http://localhost:5173/auth/verify",
+    "http://localhost:5173/auth",
   magicLinkTtlMinutes: parseNumber(process.env.MAGIC_LINK_TTL_MINUTES, 15),
   smtpHost: process.env.SMTP_HOST?.trim() || undefined,
   smtpPort: parseNumber(process.env.SMTP_PORT, 587),

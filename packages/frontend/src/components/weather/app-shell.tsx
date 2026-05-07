@@ -1,20 +1,14 @@
-import { KeyRound, PlusSquare, Radar, SunMedium } from 'lucide-react'
+import { PlusSquare, Radar, SunMedium } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { clearApiKey, getApiKey } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: Radar },
   { to: '/observations/new', label: 'Create Data', icon: PlusSquare },
-  { to: '/auth', label: 'Auth & API Keys', icon: KeyRound },
 ]
 
 export const AppShell = () => {
-  const hasApiKey = getApiKey().length > 0
-
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(20,99,86,0.18),transparent_35%),linear-gradient(165deg,#f3f8f7_0%,#edf4f1_45%,#f9f6ef_100%)] text-foreground">
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/75 backdrop-blur">
@@ -46,27 +40,18 @@ export const AppShell = () => {
               )
             })}
           </nav>
-
-          <div className="ml-auto inline-flex items-center gap-2 sm:ml-0">
-            <Badge>{hasApiKey ? 'API key loaded' : 'API key missing'}</Badge>
-            {hasApiKey ? (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  clearApiKey()
-                  window.location.reload()
-                }}
-              >
-                Sign out
-              </Button>
-            ) : null}
-          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6">
         <Outlet />
       </main>
+
+      <footer className="mx-auto flex w-full max-w-7xl items-center justify-end px-4 pb-6">
+        <Link to="/auth" className="text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline">
+          Open token page
+        </Link>
+      </footer>
     </div>
   )
 }
