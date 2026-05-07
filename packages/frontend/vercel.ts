@@ -13,6 +13,6 @@ export const config: VercelConfig = {
       },
     }) as Rewrite,
     routes.rewrite("/auth/(.*)", `${deploymentEnv("BACKEND_URL")}/auth/$1`),
-    routes.rewrite("/(.*)", "/"),
+    // routes.rewrite("/(.*)", "/"),
   ],
 };
