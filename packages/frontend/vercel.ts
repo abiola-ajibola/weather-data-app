@@ -7,7 +7,7 @@ import {
 
 export const config: VercelConfig = {
   rewrites: [
-    routes.rewrite("/(.*)", "/"),
+    // routes.rewrite("/(.*)", "/"),
     routes.rewrite("/api/(.*)", `${deploymentEnv("BACKEND_URL")}/api/$1`, {
       requestHeaders: {
         authorization: `Bearer ${deploymentEnv("API_TOKEN")}`,
