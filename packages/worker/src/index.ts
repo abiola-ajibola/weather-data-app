@@ -137,7 +137,7 @@ const extractRegionCode = (stationName: string): string => {
   return parts.length > 1 ? parts[parts.length - 1] : "Unknown";
 };
 
-const controller = new AbortController();
+// const controller = new AbortController();
 
 const ingestStationFile = async ({
   sourceUrl,
@@ -219,9 +219,9 @@ const ingestStationFile = async ({
           create: data,
           update: data,
         });
-        if (data.date.getDate() >= 31) {
-          controller.abort();
-        }
+        // if (data.date.getDate() >= 31) {
+        //   controller.abort();
+        // }
       }
     });
 
@@ -241,7 +241,7 @@ const ingestStationFile = async ({
     new URL(sourceUrl),
     {
       method: "GET",
-      signal: controller.signal,
+      // signal: controller.signal,
     },
     async (res) => {
       try {
