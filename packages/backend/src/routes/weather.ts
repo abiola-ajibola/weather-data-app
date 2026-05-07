@@ -1,17 +1,19 @@
 import type { FastifyInstance } from "fastify";
 
-import { prisma } from "@weather-data-app/database";
+import { prisma, Prisma } from "@weather-data-app/database";
 
 import { getCachedJson, setCachedJson } from "../lib/cache.js";
 import {
-  applyFilters,
-  applySort,
   classifyCondition,
   dashboardRanges,
+  FilterOperator,
   getRangeStart,
-  paginate,
+  numericFields,
   parseFilters,
+  stringFields,
+  toNumeric,
   toObservationRow,
+  WeatherFilter,
   type DashboardRange,
   type WeatherObservationRow,
 } from "../modules/weather.js";
@@ -116,36 +118,161 @@ const sanitizeInteger = (value: unknown): number | null => {
   return parsed === null ? null : Math.round(parsed);
 };
 
-const getDashboardRows = async (
-  range: DashboardRange,
-): Promise<WeatherObservationRow[]> => {
-  const startDate = getRangeStart(range);
+const mapDateOperator = (operator: FilterOperator) => {
+  switch (operator) {
+    case "after":
+      return "gt";
+    case "before":
+      return "lt";
+    case "on":
+      return "equals";
+    default:
+      return null;
+  }
+};
 
-  const observations = await prisma.weatherObservation.findMany({
-    where: {
-      OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
-      date: {
-        gte: startDate,
-      },
-    },
-    orderBy: {
-      date: "desc",
-    },
-    take: 15_000,
-  });
+const mapNumericOperator = (operator: FilterOperator) => {
+  switch (operator) {
+    case "max-value":
+      return "lte";
+    case "min-value":
+      return "gte";
+    case "exact":
+      return "eaquals";
+    default:
+      return null;
+  }
+};
 
-  return observations.map(toObservationRow);
+const mapStringOperator = (operator: FilterOperator) => {
+  switch (operator) {
+    case "contains":
+      return "contains";
+    case "not":
+      return "not";
+    case "is":
+      return "equals";
+    default:
+      return null;
+  }
+};
+
+const getWeatherObservation = async ({
+  where,
+  range,
+  filters,
+  sortBy,
+  sortDirection,
+  page,
+  pageSize,
+}: {
+  where?: Prisma.WeatherObservationWhereInput;
+  range?: DashboardRange;
+  filters?: WeatherFilter[];
+  sortBy: keyof WeatherObservationRow;
+  sortDirection: "asc" | "desc";
+  page: number;
+  pageSize: number;
+}): Promise<{
+  rows: WeatherObservationRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}> => {
+  const startDate = range && getRangeStart(range);
+  const andFilter: Prisma.WeatherObservationWhereInput["AND"] = [];
+
+  if (filters && Array.isArray(filters)) {
+    for (let { column, operator, value } of filters) {
+      if (column === "date" && !startDate) {
+        const date = new Date(value);
+        if (!isNaN(date.getTime())) {
+          const mappedOperator = mapDateOperator(operator);
+          if (mappedOperator) {
+            const f: (typeof andFilter)[0] = {
+              date: { [mappedOperator]: date },
+            };
+            andFilter.push(f);
+          }
+        }
+      }
+      if (numericFields.has(column)) {
+        const filterValue = toNumeric(value);
+        if (filterValue !== null) {
+          const mappedOperator = mapNumericOperator(operator);
+          if (mappedOperator) {
+            const f: (typeof andFilter)[0] = {
+              [column]: { [mappedOperator]: filterValue },
+            };
+            andFilter.push(f);
+          }
+        }
+      }
+      if (stringFields.has(column)) {
+        const filterValue = String(value);
+        const mappedOperator = mapStringOperator(operator);
+        if (mappedOperator) {
+          const f: (typeof andFilter)[0] = {
+            [column]:
+              mappedOperator === "not"
+                ? { not: { contains: filterValue } }
+                : { [mappedOperator]: filterValue },
+          };
+          andFilter.push(f);
+        }
+      }
+    }
+  }
+
+  const whereClause: Prisma.WeatherObservationWhereInput = {
+    OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
+    ...(startDate
+      ? {
+          date: {
+            gte: startDate,
+          },
+        }
+      : {}),
+    AND: andFilter,
+    ...where,
+  };
+
+  const orderBy = sortBy
+    ? {
+        [sortBy]: sortDirection === "asc" ? "asc" : "desc",
+      }
+    : { date: "asc" as Prisma.SortOrder };
+
+  const [observations, count] = await Promise.all([
+    prisma.weatherObservation.findMany({
+      where: whereClause,
+      orderBy,
+      take: pageSize,
+      skip: (page < 1 ? 0 : page - 1) * pageSize,
+    }),
+    prisma.weatherObservation.count({
+      where: whereClause,
+      orderBy,
+    }),
+  ]);
+
+  return {
+    rows: observations.map(toObservationRow),
+    total: count,
+    page,
+    pageSize,
+  };
 };
 
 export const registerWeatherRoutes = async (
   fastify: FastifyInstance,
 ): Promise<void> => {
   fastify.get("/api/observations/:id", async (request) => {
-    const { id } = request.params as { id: string };
+    const { id: stationId } = request.params as { id: string };
 
     const observation = await prisma.weatherObservation.findFirst({
       where: {
-        id,
+        stationId,
         OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
       },
     });
@@ -191,7 +318,14 @@ export const registerWeatherRoutes = async (
         return cached;
       }
 
-      const rows = await getDashboardRows(range);
+      const { rows, total } = await getWeatherObservation({
+        range,
+        filters,
+        sortBy,
+        sortDirection,
+        page,
+        pageSize,
+      });
 
       const stationMaxTmax = new Map<
         string,
@@ -218,12 +352,9 @@ export const registerWeatherRoutes = async (
         .sort((left, right) => right.maxTmax - left.maxTmax)
         .slice(0, 10);
 
-      const topStationIds = new Set(
-        topStations.map((station) => station.stationId),
-      );
       const baseRows =
-        topStationIds.size > 0
-          ? rows.filter((row) => topStationIds.has(row.stationId))
+        stationMaxTmax.size > 0
+          ? rows.filter((row) => stationMaxTmax.has(row.stationId))
           : rows;
 
       const conditionCounter = new Map<string, number>();
@@ -242,18 +373,14 @@ export const registerWeatherRoutes = async (
         }),
       );
 
-      const filteredRows = applyFilters(baseRows, filters);
-      const sortedRows = applySort(filteredRows, sortBy, sortDirection);
-      const pagedRows = paginate(sortedRows, page, pageSize);
-
       const result = {
         range,
         topStations,
         conditionBreakdown,
-        rows: pagedRows.rows,
-        page: pagedRows.page,
-        pageSize: pagedRows.pageSize,
-        totalRows: pagedRows.total,
+        rows,
+        page,
+        pageSize,
+        totalRows: total,
       };
 
       await setCachedJson(cacheKey, result, 60);
@@ -337,32 +464,32 @@ export const registerWeatherRoutes = async (
       const sortDirection = query.sortDirection === "asc" ? "asc" : "desc";
       const filters = parseFilters(query.filters);
 
-      const rows = (
-        await prisma.weatherObservation.findMany({
-          where: {
-            stationId,
-            OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
-            date: {
-              gte: new Date("2020-01-01T00:00:00.000Z"),
-            },
-          },
-          orderBy: {
-            date: "desc",
-          },
-          take: 20_000,
-        })
-      ).map(toObservationRow);
+      const cacheKey = `observations:${stationId}:${sortBy}:${sortDirection}:${page}:${pageSize}:${query.filters ?? ""}`;
+      const cached = await getCachedJson<unknown>(cacheKey);
+      if (cached) {
+        return cached;
+      }
 
-      const filtered = applyFilters(rows, filters);
-      const sorted = applySort(filtered, sortBy, sortDirection);
-      const paged = paginate(sorted, page, pageSize);
+      const {
+        rows,
+        total,
+        page: currentPage,
+        pageSize: currentPageSize,
+      } = await getWeatherObservation({
+        where: { stationId },
+        filters,
+        sortBy,
+        sortDirection,
+        page,
+        pageSize,
+      });
 
       return {
         stationId,
-        rows: paged.rows,
-        totalRows: paged.total,
-        page: paged.page,
-        pageSize: paged.pageSize,
+        rows,
+        totalRows: total,
+        page: currentPage,
+        pageSize: currentPageSize,
       };
     },
   );

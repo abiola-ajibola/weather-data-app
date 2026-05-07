@@ -83,12 +83,11 @@ export type WeatherRowListOptions = {
 
 export type ObservationPayload = Omit<WeatherObservationRow, 'id'>
 
-export type ApiKeyItem = {
-  id: string
+export type CreateApiTokenResponse = {
+  ok: boolean
+  apiKey: string
+  keyId: string
   email: string
   label: string
   keyPrefix: string
-  createdAt: string
-  revokedAt: string | null
-  lastUsedAt: string | null
 }

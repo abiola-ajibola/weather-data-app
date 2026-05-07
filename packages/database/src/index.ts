@@ -4,7 +4,10 @@ let __prisma;
 
 const prismaSingleton = (): PrismaClient => {
   return new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["error", "warn", "info", "query"]
+        : ["error"],
   });
 };
 

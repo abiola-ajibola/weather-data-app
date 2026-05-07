@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx --watch src/index.ts",
+    "dev": "yarn workspace @weather-data-app/database build && tsx --watch src/index.ts",
     "build": "yarn workspace @weather-data-app/database build && tsc -p tsconfig.json",
     "start": "yarn workspace @weather-data-app/database build && node dist/index.js"
   },

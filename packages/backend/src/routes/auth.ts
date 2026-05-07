@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify'
 
 import { prisma } from '@weather-data-app/database'
 
-import { env } from '../config/env.js'
 import {
   apiKeyPrefix,
   generateApiKey,
@@ -11,6 +10,7 @@ import {
   isEmailLike,
   normalizeEmail,
 } from '../lib/auth.js'
+import { env } from '../config/env.js'
 import { sendMagicLinkEmail } from '../lib/mailer.js'
 
 const requestLinkBodySchema = {
@@ -31,6 +31,25 @@ const verifyLinkBodySchema = {
     label: { type: 'string', minLength: 2, maxLength: 80 },
   },
 } as const
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+
+const revokeStaleTokens = async (now: Date): Promise<void> => {
+  const staleBefore = new Date(now.getTime() - THIRTY_DAYS_MS)
+
+  await prisma.apiKey.updateMany({
+    where: {
+      revokedAt: null,
+      OR: [
+        { lastUsedAt: { lt: staleBefore } },
+        { lastUsedAt: null, createdAt: { lt: staleBefore } },
+      ],
+    },
+    data: {
+      revokedAt: now,
+    },
+  })
+}
 
 export const registerAuthRoutes = async (
   fastify: FastifyInstance,
@@ -58,9 +77,7 @@ export const registerAuthRoutes = async (
 
       const token = generateMagicLinkToken()
       const tokenHash = hashToken(token)
-      const expiresAt = new Date(
-        Date.now() + env.magicLinkTtlMinutes * 60 * 1000,
-      )
+      const expiresAt = new Date(Date.now() + env.magicLinkTtlMinutes * 60 * 1000)
 
       await prisma.magicLinkToken.create({
         data: {
@@ -117,6 +134,19 @@ export const registerAuthRoutes = async (
         throw fastify.httpErrors.unauthorized('The magic link is invalid or expired.')
       }
 
+      const now = new Date()
+      await revokeStaleTokens(now)
+
+      await prisma.apiKey.updateMany({
+        where: {
+          email: tokenRecord.email,
+          OR:[{revokedAt: null}, {revokedAt: {isSet: false}}]
+        },
+        data: {
+          revokedAt: now,
+        },
+      })
+
       const apiKey = generateApiKey()
       const keyHash = hashToken(apiKey)
 
@@ -134,7 +164,7 @@ export const registerAuthRoutes = async (
           id: tokenRecord.id,
         },
         data: {
-          consumedAt: new Date(),
+          consumedAt: now,
         },
       })
 
@@ -148,54 +178,4 @@ export const registerAuthRoutes = async (
       }
     },
   )
-
-  fastify.get('/auth/api-keys', async (request) => {
-    if (!request.authEmail) {
-      throw fastify.httpErrors.unauthorized('Missing auth context.')
-    }
-
-    const keys = await prisma.apiKey.findMany({
-      where: {
-        email: request.authEmail,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
-
-    return {
-      items: keys.map((key) => ({
-        id: key.id,
-        email: key.email,
-        label: key.label,
-        keyPrefix: key.keyPrefix,
-        createdAt: key.createdAt.toISOString(),
-        revokedAt: key.revokedAt?.toISOString() ?? null,
-        lastUsedAt: key.lastUsedAt?.toISOString() ?? null,
-      })),
-    }
-  })
-
-  fastify.delete('/auth/api-keys/:id', async (request) => {
-    if (!request.authEmail) {
-      throw fastify.httpErrors.unauthorized('Missing auth context.')
-    }
-
-    const { id } = request.params as { id: string }
-
-    const key = await prisma.apiKey.findUnique({ where: { id } })
-
-    if (!key || key.email !== request.authEmail) {
-      throw fastify.httpErrors.notFound('API key not found.')
-    }
-
-    await prisma.apiKey.update({
-      where: { id },
-      data: {
-        revokedAt: new Date(),
-      },
-    })
-
-    return { ok: true }
-  })
 }

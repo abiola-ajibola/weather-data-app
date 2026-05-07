@@ -16,6 +16,8 @@ const unauthenticatedPaths = new Set([
   "/auth/verify-link",
 ]);
 
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
 const shouldSkipAuth = (path: string): boolean => {
   if (unauthenticatedPaths.has(path)) {
     return true;
@@ -79,14 +81,27 @@ export const buildApp = (): FastifyInstance => {
     const apiKey = await prisma.apiKey.findUnique({
       where: {
         keyHash,
-        revokedAt: undefined,
+        OR: [{ revokedAt: undefined }, { revokedAt: { isSet: false } }],
       },
     });
 
-    console.log({ keyHash, apiKey, token });
-
     if (!apiKey) {
       return reply.unauthorized("Invalid bearer token.");
+    }
+
+    const now = new Date();
+    const staleBefore = new Date(now.getTime() - THIRTY_DAYS_MS);
+    const lastActivity = apiKey.lastUsedAt ?? apiKey.createdAt;
+
+    if (lastActivity.getTime() < staleBefore.getTime()) {
+      await prisma.apiKey.update({
+        where: { id: apiKey.id },
+        data: {
+          revokedAt: now,
+        },
+      });
+
+      return reply.unauthorized("Bearer token has expired due to inactivity.");
     }
 
     request.apiKey = apiKey;

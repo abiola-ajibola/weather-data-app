@@ -1,5 +1,5 @@
 import type {
-  ApiKeyItem,
+  CreateApiTokenResponse,
   DashboardRange,
   DashboardResponse,
   ObservationPayload,
@@ -11,22 +11,10 @@ import type {
 
 const apiBaseUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim() ||
   'http://localhost:3001'
-const apiKeyStorageKey = 'weather-data-app.apiKey'
 
 type ApiRequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   body?: unknown
-  includeAuth?: boolean
-}
-
-export const getApiKey = (): string => localStorage.getItem(apiKeyStorageKey) ?? ''
-
-export const setApiKey = (value: string): void => {
-  localStorage.setItem(apiKeyStorageKey, value)
-}
-
-export const clearApiKey = (): void => {
-  localStorage.removeItem(apiKeyStorageKey)
 }
 
 const createQuery = (params: Record<string, string | number | undefined>): string => {
@@ -49,13 +37,9 @@ const request = async <T>(
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   }
-
-  if (options.includeAuth !== false) {
-    const apiKey = getApiKey()
-    if (apiKey) {
-      headers.Authorization = `Bearer ${apiKey}`
+    if (import.meta.env.DEV) {
+      headers.Authorization = `Bearer ${import.meta.env.VITE_API_KEY}`
     }
-  }
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
     method: options.method ?? 'GET',
@@ -71,21 +55,21 @@ const request = async <T>(
   return (await response.json()) as T
 }
 
-export const requestMagicLink = async (email: string): Promise<{ ok: boolean }> =>
-  request('/auth/request-link', {
-    method: 'POST',
-    body: { email },
-    includeAuth: false,
-  })
-
-export const verifyMagicLink = async (
+export const createApiToken = async (
   token: string,
   label: string,
-): Promise<{ ok: boolean; apiKey: string; email: string; label: string }> =>
+): Promise<CreateApiTokenResponse> =>
   request('/auth/verify-link', {
     method: 'POST',
     body: { token, label },
-    includeAuth: false,
+  })
+
+export const requestMagicLink = async (
+  email: string,
+): Promise<{ ok: boolean; expiresAt: string }> =>
+  request('/auth/request-link', {
+    method: 'POST',
+    body: { email },
   })
 
 export const fetchDashboard = async (
@@ -153,10 +137,3 @@ export const deleteObservations = async (
     body: { ids },
   })
 
-export const fetchApiKeys = async (): Promise<{ items: ApiKeyItem[] }> =>
-  request('/auth/api-keys')
-
-export const revokeApiKey = async (id: string): Promise<{ ok: boolean }> =>
-  request(`/auth/api-keys/${id}`, {
-    method: 'DELETE',
-  })
