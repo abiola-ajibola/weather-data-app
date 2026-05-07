@@ -213,7 +213,6 @@ const getWeatherObservation = async ({
         const mappedOperator = mapStringOperator(operator);
         if (mappedOperator) {
           const f: (typeof andFilter)[0] = {
-            // stationName: { not: "us" },
             [column]:
               mappedOperator === "not"
                 ? { not: { contains: filterValue } }
@@ -252,7 +251,7 @@ const getWeatherObservation = async ({
       skip: (page < 1 ? 0 : page - 1) * pageSize,
     }),
     prisma.weatherObservation.count({
-      where,
+      where: whereClause,
       orderBy,
     }),
   ]);
