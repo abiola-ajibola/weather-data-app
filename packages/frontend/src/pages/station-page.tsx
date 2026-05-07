@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { WeatherFilters } from "@/components/weather/filters";
 import { WeatherTable } from "@/components/weather/weather-table";
@@ -12,17 +12,23 @@ import type {
   WeatherObservationRow,
 } from "@/lib/types";
 import { defaultFilterColumns } from "@/lib/constants";
+import { getInitialFilters } from "@/lib/searchParamsValiation";
 
 export const StationPage = () => {
   const queryClient = useQueryClient();
   const params = useParams();
+  const [searchParams, setSearchParams] = useSearchParams(
+    window.location.search,
+  );
   const stationId = params.stationId ?? "";
 
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [sortBy, setSortBy] = useState<keyof WeatherObservationRow>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [filters, setFilters] = useState<WeatherFilter[]>([]);
+  const [filters, setFilters] = useState<WeatherFilter[]>(
+    getInitialFilters(searchParams.get("filters") || null),
+  );
 
   const queryKey = useMemo(
     () => [
@@ -70,8 +76,7 @@ export const StationPage = () => {
         <CardHeader>
           <CardTitle>Station Details</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Station ID: <strong>{stationId}</strong> | Data from Jan 1, 2020 to
-            present.
+            Station ID: <strong>{stationId}</strong>
           </p>
           <Link
             to="/"
@@ -86,6 +91,10 @@ export const StationPage = () => {
             columns={stationFilterColumns}
             onChange={(nextFilters) => {
               setFilters(nextFilters);
+              setSearchParams((params) => ({
+                ...Object.fromEntries(params.entries()),
+                filters: JSON.stringify(nextFilters),
+              }));
               setPage(1);
             }}
           />
