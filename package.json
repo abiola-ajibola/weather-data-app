@@ -10,6 +10,7 @@
     "build": "yarn workspaces foreach --all -pt run build",
     "start": "yarn workspaces foreach --all -pt run start",
     "start:backend": "yarn workspace @weather-data-app/backend start",
+    "start:prod:backend": "yarn workspace @weather-data-app/backend start:prod",
     "start:frontend": "yarn workspace @weather-data-app/frontend start",
     "start:worker": "yarn workspace @weather-data-app/worker start",
     "ingest:weather": "yarn workspace @weather-data-app/worker ingest",

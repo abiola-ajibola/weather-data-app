@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "yarn workspace @weather-data-app/database build && tsx --watch src/index.ts",
     "build": "yarn workspace @weather-data-app/database build && tsc -p tsconfig.json",
-    "start": "yarn workspace @weather-data-app/database build && node dist/index.js"
+    "start": "yarn workspace @weather-data-app/database build && node dist/index.js",
+    "start:prod": "node dist/index.js"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
