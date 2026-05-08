@@ -1,0 +1,25 @@
+# VCS and editor metadata
+.git
+.github
+.vscode
+.agents
+
+# Dependencies and build artifacts
+node_modules
+**/node_modules
+**/dist
+
+# Logs and temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.tmp
+.temp
+
+# Local env files
+.env
+.env.*
+
+# Large local datasets not needed for backend image runtime
+sample-dataset
