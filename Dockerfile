@@ -1,5 +1,6 @@
-# syntax=docker/dockerfile:1.7
 FROM node:24-alpine
+
+ARG DATABASE_URL
 
 WORKDIR /app
 
@@ -17,6 +18,7 @@ RUN yarn workspace @weather-data-app/backend build
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
+ENV DATABASE_URL=$DATABASE_URL
 
 EXPOSE $PORT
 
