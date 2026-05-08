@@ -141,7 +141,7 @@ process.on("SIGTERM", () => {
 
 const start = async (): Promise<void> => {
   try {
-    await app.listen({ port: env.port});
+    await app.listen({ port: env.port, host: env.host});
   } catch (error) {
     app.log.error(error, "Failed to start server");
     process.exit(1);
