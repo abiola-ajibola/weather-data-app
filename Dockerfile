@@ -7,7 +7,6 @@ RUN corepack enable
 
 # Copy Yarn metadata first to maximize Docker layer caching.
 COPY package.json yarn.lock .yarnrc.yml ./
-COPY .yarn/ ./.yarn/
 
 # Copy workspaces.
 COPY packages/ ./packages/
