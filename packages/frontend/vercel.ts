@@ -1,6 +1,7 @@
 import {
+  Rewrite,
   routes,
-  // deploymentEnv,
+  deploymentEnv,
   type VercelConfig,
   // Rewrite,
 } from "@vercel/config/v1";
@@ -12,7 +13,7 @@ export const config: VercelConfig = {
     //     authorization: `Bearer ${deploymentEnv("API_TOKEN")}`,
     //   },
     // }) as Rewrite,
-    // routes.rewrite("/auth/(.*)", `${deploymentEnv("BACKEND_URL")}/auth/$1`),
-    routes.rewrite("/(.*)", "/"),
+    routes.rewrite("/auth/(.*)", `${deploymentEnv("BACKEND_URL")}/auth/$1`),
+    routes.rewrite("/(.*)", "/") as Rewrite,
   ],
 };
