@@ -1,9 +1,8 @@
 import {
-  Rewrite,
   routes,
   deploymentEnv,
   type VercelConfig,
-  // Rewrite,
+  Rewrite,
 } from "@vercel/config/v1";
 
 export const config: VercelConfig = {
