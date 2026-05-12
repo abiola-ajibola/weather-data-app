@@ -21,14 +21,14 @@ import { getInitialFilters } from "@/lib/searchParamsValiation";
 const dashboardRangeSchema = z.enum(["24h", "7d", "30d"]);
 
 const getInitialRange = (value: string | null) => {
-  if (!value) return "24h";
+  if (!value) return "30d";
   try {
     const result = dashboardRangeSchema.safeParse(value);
 
     return result.success ? result.data : "24h";
   } catch (error) {
     console.error({ error });
-    return "24h";
+    return "30d";
   }
 };
 
