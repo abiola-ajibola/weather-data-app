@@ -91,8 +91,8 @@ export const DashboardCharts = ({
               outerRadius={120}
               innerRadius={54}
               paddingAngle={3}
-              label={(slice) =>
-                `${String(slice.name ?? '')} ${Number(slice.percent ?? 0).toFixed(0)}%`
+              label={({ name, value }) =>
+                `${String(name ?? '')} ${Number(value ?? 0).toFixed(1)}%`
               }
             >
               {conditionBreakdown.map((entry, index) => (
