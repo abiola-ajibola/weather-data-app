@@ -1,10 +1,8 @@
-import { createReadStream } from "node:fs";
-import { readdir } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
-import { fileURLToPath } from "node:url";
 import { createGunzip } from "node:zlib";
 import { extract } from "tar-stream";
+import { PipelineSource } from "node:stream";
+import { IncomingMessage } from "node:http";
 
 import { prisma } from "@weather-data-app/database";
 import { parse } from "csv-parse";
@@ -81,7 +79,11 @@ type ObservationPayload = {
   mdtxAttributes: string[];
 };
 
-type IngestArgs = { sourceUrl: string; startDate?: Date; endDate?: Date };
+type IngestArgs = {
+  source: PipelineSource<any>;
+  startDate?: Date;
+  endDate?: Date;
+};
 
 const toNumber = (value: string | undefined): number => {
   const parsed = Number(value?.trim());
@@ -139,8 +141,8 @@ const extractRegionCode = (stationName: string): string => {
 
 // const controller = new AbortController();
 
-const ingestStationFile = async ({
-  sourceUrl,
+export const ingestStationFile = async ({
+  source,
   startDate,
   endDate,
 }: IngestArgs): Promise<void> => {
@@ -148,10 +150,17 @@ const ingestStationFile = async ({
   const extractor = extract();
   const startTime = startDate?.getTime();
   const endTime = endDate?.getTime();
+  let count = 0;
+  let errors = 0;
+  const stdoutBuffer = Buffer.from("");
 
   extractor.on("entry", async (headers, stream, next) => {
-    console.log("entry");
-    console.log(headers.name);
+    // console.log("entry");
+    // count++;
+    // console.log(headers.name);
+    process.stdout.write(
+      `\x1b[1A\x1b[2K\x1b[1A\x1b[2K\x1b[1A\x1b[2K \nFile Name:\t${headers.name}\n\x1b[38;2;128;255;128mCount:\t\t${count++}\x1b[0m\n\x1b[38;2;255;128;128mErrors:\t\t${errors}\x1b[0m`,
+    );
     const parser = parse({
       columns: true,
       skip_empty_lines: true,
@@ -220,17 +229,16 @@ const ingestStationFile = async ({
             create: data,
             update: data,
           });
-          // if (data.date.getDate() >= 31) {
-          //   controller.abort();
-          // }
         }
       } catch (e) {
         console.error(e);
+        errors++;
       }
     });
 
     parser.on("error", function (err) {
       console.log({ err });
+      errors++;
     });
     stream.on("error", (err) => next(err));
     stream.on("data", async (chunk: Buffer) => {
@@ -241,27 +249,33 @@ const ingestStationFile = async ({
     });
   });
 
-  get(
-    new URL(sourceUrl),
-    {
-      method: "GET",
-      // signal: controller.signal,
-    },
-    async (res) => {
-      try {
-        await pipeline(res, gunzip, extractor);
-      } catch (error) {
-        console.log({ error });
-      }
-    },
-  );
+  try {
+    await pipeline(source, gunzip, extractor);
+  } catch (error) {
+    console.log({ error });
+  }
 };
 
-ingestStationFile({
-  sourceUrl:
-    "https://www.ncei.noaa.gov/data/daily-summaries/archive/daily-summaries-latest.tar.gz",
-  startDate: new Date("2026-05-03"),
-  endDate: new Date(""),
-})
-  .catch(console.trace)
-  .finally(async () => await prisma.$disconnect());
+(async () => {
+  const response = await new Promise<IncomingMessage>((resolve, reject) => {
+    get(
+      new URL(
+        "https://www.ncei.noaa.gov/data/daily-summaries/archive/daily-summaries-latest.tar.gz",
+      ),
+      {
+        method: "GET",
+      },
+      (res) => {
+        res.on("error", reject);
+        resolve(res);
+      },
+    );
+  });
+  ingestStationFile({
+    source: response,
+    startDate: new Date("2026-05-03"),
+    endDate: new Date(""),
+  })
+    .catch(console.trace)
+    .finally(async () => await prisma.$disconnect());
+})();
