@@ -255,27 +255,3 @@ export const ingestStationFile = async ({
     console.log({ error });
   }
 };
-
-(async () => {
-  const response = await new Promise<IncomingMessage>((resolve, reject) => {
-    get(
-      new URL(
-        "https://www.ncei.noaa.gov/data/daily-summaries/archive/daily-summaries-latest.tar.gz",
-      ),
-      {
-        method: "GET",
-      },
-      (res) => {
-        res.on("error", reject);
-        resolve(res);
-      },
-    );
-  });
-  ingestStationFile({
-    source: response,
-    startDate: new Date("2026-05-03"),
-    endDate: new Date(""),
-  })
-    .catch(console.trace)
-    .finally(async () => await prisma.$disconnect());
-})();

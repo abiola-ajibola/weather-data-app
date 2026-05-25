@@ -1,4 +1,6 @@
 import { createReadStream } from "node:fs";
+import path from "node:path";
+
 import minimist from "minimist";
 import { ingestStationFile } from "./index.js";
 import { prisma } from "@weather-data-app/database";
@@ -36,13 +38,15 @@ async function ingestFile() {
 
   const filePath = args.file;
 
-  console.log(`file path: ${filePath}`);
-
   if (!filePath) {
     throw new Error(
       'Missing file path. Usage: yarn workspace @weather-data-app/worker ingest:file -- --file "path/to/file.tar.gz" [--startDate 2024-01-01] [--endDate 2024-12-31]',
     );
   }
+
+  const sourcePath = path.resolve("..","..",filePath)
+  
+  console.log(`file path: ${sourcePath}`);
 
   const startDate = parseDate(args.startDate, "startDate");
   const endDate = parseDate(args.endDate, "endDate");
@@ -51,7 +55,7 @@ async function ingestFile() {
     throw new Error("startDate must be before or equal to endDate.");
   }
 
-  const source = createReadStream(filePath);
+  const source = createReadStream(sourcePath);
   await ingestStationFile({ source, startDate, endDate });
 }
 

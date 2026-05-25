@@ -13,7 +13,7 @@
     "start:prod:backend": "yarn workspace @weather-data-app/backend start:prod",
     "start:frontend": "yarn workspace @weather-data-app/frontend start",
     "start:worker": "yarn workspace @weather-data-app/worker start",
-    "ingest:weather": "yarn workspace @weather-data-app/worker ingest",
+    "ingest:weather:url": "yarn workspace @weather-data-app/worker ingest:url",
     "ingest:weather:file": "yarn workspace @weather-data-app/worker ingest:file",
     "db:generate": "yarn workspace @weather-data-app/database prisma:generate",
     "db:migrate:dev": "yarn workspace @weather-data-app/database prisma:migrate:dev"

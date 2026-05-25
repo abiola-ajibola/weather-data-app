@@ -8,7 +8,7 @@
     "dev": "yarn workspace @weather-data-app/database build && tsx watch src/index.ts",
     "build": "yarn workspace @weather-data-app/database build && tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "ingest": "yarn workspace @weather-data-app/database build && tsx src/index.ts",
+    "ingest:url": "yarn workspace @weather-data-app/database build && tsx src/ingest_url.ts",
     "ingest:file": "yarn workspace @weather-data-app/database build && tsx src/ingest_file.ts"
   },
   "dependencies": {
