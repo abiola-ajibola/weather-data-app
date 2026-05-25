@@ -2,11 +2,9 @@ import { pipeline } from "node:stream/promises";
 import { createGunzip } from "node:zlib";
 import { extract } from "tar-stream";
 import { PipelineSource } from "node:stream";
-import { IncomingMessage } from "node:http";
 
 import { prisma } from "@weather-data-app/database";
 import { parse } from "csv-parse";
-import { get } from "node:https";
 
 type CsvRow = {
   STATION?: string;
@@ -152,12 +150,9 @@ export const ingestStationFile = async ({
   const endTime = endDate?.getTime();
   let count = 0;
   let errors = 0;
-  const stdoutBuffer = Buffer.from("");
 
   extractor.on("entry", async (headers, stream, next) => {
-    // console.log("entry");
-    // count++;
-    // console.log(headers.name);
+    //TODO!: Definitely replace this with libraries for color and cursor manipulation
     process.stdout.write(
       `\x1b[1A\x1b[2K\x1b[1A\x1b[2K\x1b[1A\x1b[2K \nFile Name:\t${headers.name}\n\x1b[38;2;128;255;128mCount:\t\t${count++}\x1b[0m\n\x1b[38;2;255;128;128mErrors:\t\t${errors}\x1b[0m`,
     );
