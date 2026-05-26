@@ -8,11 +8,14 @@
     "dev": "yarn workspace @weather-data-app/database build && tsx watch src/index.ts",
     "build": "yarn workspace @weather-data-app/database build && tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "convert:iso-table": "tsx src/lib/convert-iso-table.ts",
+    "convert:iso-table:json": "tsx src/lib/convert-iso-table-json.ts",
     "ingest:url": "yarn workspace @weather-data-app/database build && tsx src/ingest_url.ts",
     "ingest:file": "yarn workspace @weather-data-app/database build && tsx src/ingest_file.ts"
   },
   "dependencies": {
     "@weather-data-app/database": "workspace:*",
+    "cheerio": "^1.2.0",
     "csv-parse": "^6.2.1",
     "log-update": "^8.0.0",
     "minimist": "^1.2.8",

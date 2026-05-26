@@ -8,6 +8,9 @@ import color from "yoctocolors";
 import { prisma } from "@weather-data-app/database";
 import { parse } from "csv-parse";
 
+import iso_codes from "./lib/ISO-codes-table.json" with { type: "json" };
+export const country_codes = iso_codes;
+
 type CsvRow = {
   STATION?: string;
   DATE?: string;
