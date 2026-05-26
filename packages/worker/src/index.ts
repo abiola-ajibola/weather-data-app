@@ -2,6 +2,8 @@ import { pipeline } from "node:stream/promises";
 import { createGunzip } from "node:zlib";
 import { extract } from "tar-stream";
 import { PipelineSource } from "node:stream";
+import logUpdate from "log-update";
+import color from "yoctocolors";
 
 import { prisma } from "@weather-data-app/database";
 import { parse } from "csv-parse";
@@ -137,8 +139,6 @@ const extractRegionCode = (stationName: string): string => {
   return parts.length > 1 ? parts[parts.length - 1] : "Unknown";
 };
 
-// const controller = new AbortController();
-
 export const ingestStationFile = async ({
   source,
   startDate,
@@ -150,12 +150,24 @@ export const ingestStationFile = async ({
   const endTime = endDate?.getTime();
   let count = 0;
   let errors = 0;
+  let saved = 0;
+  let skipped = 0;
+  let currentFileName = "-";
+
+  const logProgress = () => {
+    logUpdate(
+      `File Name:\t${currentFileName}\n` +
+        `${color.blue(`Count:\t\t${count}`)}` +
+        `\n${color.green(`Saved:\t\t${saved}`)}` +
+        `\n${color.yellow(`Skipped:\t${skipped}`)}` +
+        `\n${color.red(`Errors:\t\t${errors}\n`)}`,
+    );
+  };
 
   extractor.on("entry", async (headers, stream, next) => {
-    //TODO!: Definitely replace this with libraries for color and cursor manipulation
-    process.stdout.write(
-      `\x1b[1A\x1b[2K\x1b[1A\x1b[2K\x1b[1A\x1b[2K \nFile Name:\t${headers.name}\n\x1b[38;2;128;255;128mCount:\t\t${count++}\x1b[0m\n\x1b[38;2;255;128;128mErrors:\t\t${errors}\x1b[0m`,
-    );
+    count += 1;
+    currentFileName = headers.name;
+    logProgress();
     const parser = parse({
       columns: true,
       skip_empty_lines: true,
@@ -224,16 +236,21 @@ export const ingestStationFile = async ({
             create: data,
             update: data,
           });
+          saved += 1;
+        } else {
+          skipped += 1;
         }
       } catch (e) {
         console.error(e);
-        errors++;
+        errors += 1;
+        logProgress();
       }
     });
 
     parser.on("error", function (err) {
-      console.log({ err });
-      errors++;
+      console.error({ err });
+      errors += 1;
+      logProgress();
     });
     stream.on("error", (err) => next(err));
     stream.on("data", async (chunk: Buffer) => {
@@ -247,6 +264,9 @@ export const ingestStationFile = async ({
   try {
     await pipeline(source, gunzip, extractor);
   } catch (error) {
-    console.log({ error });
+    console.error({ error });
+    logProgress();
+  } finally {
+    logUpdate.done();
   }
 };

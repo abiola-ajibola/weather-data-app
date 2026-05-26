@@ -14,7 +14,9 @@
   "dependencies": {
     "@weather-data-app/database": "workspace:*",
     "csv-parse": "^6.2.1",
-    "minimist": "^1.2.8"
+    "log-update": "^8.0.0",
+    "minimist": "^1.2.8",
+    "yoctocolors": "^2.1.2"
   },
   "devDependencies": {
     "@types/minimist": "^1.2.5",
