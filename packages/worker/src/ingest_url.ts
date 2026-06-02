@@ -1,4 +1,5 @@
-import { get, IncomingMessage } from "node:http";
+import { get } from "node:https";
+import { IncomingMessage } from "node:http";
 
 import { prisma } from "@weather-data-app/database";
 import { ingestStationFile } from "./index.js";
