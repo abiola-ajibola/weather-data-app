@@ -10,7 +10,7 @@ import { parse } from "csv-parse";
 
 import iso_codes from "./lib/ISO-codes-table.json" with { type: "json" };
 import { RowWorkerPool, type CsvRow } from "./row-worker-pool.js";
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 
 import { monitorEventLoopDelay, eventLoopUtilization } from "perf_hooks";
 
@@ -30,7 +30,7 @@ type IngestArgs = {
 };
 
 const cpus_count = cpus().length;
-const isDebug = process.argv.includes("--debug")
+const isDebug = process.argv.includes("--debug");
 
 const resolveWorkerCount = (): number => {
   const configured = Number(process.env.WORKER_THREADS);
@@ -207,6 +207,7 @@ export const ingestStationFile = async ({
   } finally {
     await workerPool.close();
     logUpdate.done();
+    await mkdir("status_logs", { recursive: true });
     await writeFile(
       `status_logs/final_status_${Date.now()}.log`,
       `File Name:\t${currentFileName}\n` +
