@@ -305,7 +305,7 @@ export const registerWeatherRoutes = async (
         sortDirection?: "asc" | "desc";
         filters?: string;
       };
-      console.log({ query });
+
       const range = dashboardRanges.includes(query.range as DashboardRange)
         ? query.range
         : "24h";
