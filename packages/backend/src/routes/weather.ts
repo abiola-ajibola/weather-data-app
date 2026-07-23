@@ -179,7 +179,10 @@ const getWeatherObservation = async ({
   page: number;
   pageSize: number;
 }> => {
-  const startDate = range && getRangeStart(range);
+  const startDate =
+    Array.isArray(filters) && filters.some((filter) => filter.column === "date")
+      ? null
+      : range && getRangeStart(range);
   const andFilter: Prisma.WeatherObservationWhereInput["AND"] = [];
 
   if (filters && Array.isArray(filters)) {
@@ -302,9 +305,9 @@ export const registerWeatherRoutes = async (
         sortDirection?: "asc" | "desc";
         filters?: string;
       };
-
-      const range = dashboardRanges.includes(query.range ?? "24h")
-        ? (query.range ?? "24h")
+      console.log({ query });
+      const range = dashboardRanges.includes(query.range as DashboardRange)
+        ? query.range
         : "24h";
       const page = Number(query.page ?? 1);
       const pageSize = Number(query.pageSize ?? 50);
