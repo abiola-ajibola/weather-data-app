@@ -40,10 +40,16 @@ export const HomePage = () => {
   const [range, setRange] = useState<DashboardRange>(
     getInitialRange(searchParams.get("range")),
   );
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
   const [pageSize] = useState(50);
-  const [sortBy, setSortBy] = useState<keyof WeatherObservationRow>("date");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [sortBy, setSortBy] = useState<keyof WeatherObservationRow>(
+    (searchParams.get("sortBy") as
+      | keyof WeatherObservationRow
+      | undefined) || "date",
+  );
+  const [sortDirection, setSortDirection] = useState<SortDirection>(
+    (searchParams.get("sortDirection") as SortDirection | undefined) || "desc",
+  );
   const [filters, setFilters] = useState<WeatherFilter[]>(
     getInitialFilters(searchParams.get("filters") || null),
   );
@@ -71,6 +77,29 @@ export const HomePage = () => {
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
+
+  const handlePageChange = (pageNumber: number) => {
+    setPage(pageNumber);
+    setSearchParams((params) => ({
+      ...Object.fromEntries(params.entries()),
+      page: pageNumber.toString(),
+    }));
+  };
+
+  const handleSortChange = (
+    column: keyof WeatherObservationRow,
+    direction: SortDirection,
+  ) => {
+    setSortBy(column);
+    setSortDirection(direction);
+    setPage(1);
+    setSearchParams((params) => ({
+      ...Object.fromEntries(params.entries()),
+      page: "1",
+      sortBy: column,
+      sortDirection: direction,
+    }));
+  };
 
   return (
     <section className="space-y-5">
@@ -130,12 +159,8 @@ export const HomePage = () => {
         sortDirection={sortDirection}
         filters={filters}
         loading={dashboardQuery.isFetching || deleteMutation.isPending}
-        onPageChange={setPage}
-        onSortChange={(column, direction) => {
-          setSortBy(column);
-          setSortDirection(direction);
-          setPage(1);
-        }}
+        onPageChange={handlePageChange}
+        onSortChange={handleSortChange}
         onDeleteSelected={async (ids) => {
           if (ids.length === 0) {
             return;
