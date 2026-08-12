@@ -9,7 +9,7 @@ import { prisma } from "@weather-data-app/database";
 import { parse } from "csv-parse";
 
 import iso_codes from "./lib/ISO-codes-table.json" with { type: "json" };
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 export const country_codes = iso_codes;
 
 type CsvRow = {
@@ -272,6 +272,7 @@ export const ingestStationFile = async ({
     logProgress();
   } finally {
     logUpdate.done();
+    await mkdir("status_logs", { recursive: true });
     await writeFile(
       `status_logs/final_status_${Date.now()}.log`,
       `File Name:\t${currentFileName}\n` +

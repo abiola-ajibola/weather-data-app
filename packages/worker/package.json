@@ -10,8 +10,10 @@
     "start": "node dist/index.js",
     "convert:iso-table": "tsx src/lib/convert-iso-table.ts",
     "convert:iso-table:json": "tsx src/lib/convert-iso-table-json.ts",
-    "ingest:url": "yarn workspace @weather-data-app/database build && tsx src/ingest_url.ts",
-    "ingest:file": "yarn workspace @weather-data-app/database build && tsx src/ingest_file.ts"
+    "ingest:url": "yarn build && node dist/ingest_url.js",
+    "ingest:url:dev": "yarn workspace @weather-data-app/database build && tsx src/ingest_url.ts",
+    "ingest:file": "yarn build && node dist/ingest_file.js",
+    "ingest:file:dev": "yarn workspace @weather-data-app/database build && tsx src/ingest_file.ts"
   },
   "dependencies": {
     "@weather-data-app/database": "workspace:*",
