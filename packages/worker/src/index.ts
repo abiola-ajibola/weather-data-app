@@ -181,6 +181,7 @@ export const ingestStationFile = async ({
 
     parser.on("data", async (row: CsvRow) => {
       try {
+        parser.pause();
         const time = row.DATE ? new Date(row.DATE).getTime() : 0;
         if (time >= (startTime || 0) && time <= (endTime || Infinity)) {
           const stationId = row.STATION?.trim() || "";
@@ -228,18 +229,24 @@ export const ingestStationFile = async ({
             where: { stationId: station.stationId },
           });
 
-          if (!existingStation)
-            await prisma.weatherStation.create({
+          if (!existingStation) {
+            const created = await prisma.weatherStation.create({
               data: station,
             });
-
-          await prisma.weatherObservation.upsert({
-            where: {
-              stationId_date: { stationId: station.stationId, date: data.date },
-            },
-            create: data,
-            update: data,
-          });
+            if (created) parser.resume();
+          } else {
+            const updated = await prisma.weatherObservation.upsert({
+              where: {
+                stationId_date: {
+                  stationId: station.stationId,
+                  date: data.date,
+                },
+              },
+              create: data,
+              update: data,
+            });
+            if (updated) parser.resume();
+          }
           saved += 1;
         } else {
           skipped += 1;
