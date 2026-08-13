@@ -317,11 +317,12 @@ export const ingestStationFile = async ({
     await writeFile(
       `status_logs/final_status_${Date.now()}.log`,
       `File Name:\t${currentFileName}\n` +
-        `${color.blue(`Count:\t\t${count}`)}` +
-        `\n${color.green(`Saved:\t\t${saved}`)}` +
-        `\n${color.yellow(`Skipped:\t${skipped}`)}` +
-        `\n${color.red(`Errors:\t\t${errors}`)}` +
-        progressText,
+        `${`Count:\t\t${count}`}` +
+        `\n${`Saved:\t\t${saved}`}` +
+        `\n${`Skipped:\t${skipped}`}` +
+        `\n${`Errors:\t\t${errors}`}` +
+        progressText +
+        errorMessage,
     );
   }
 };
