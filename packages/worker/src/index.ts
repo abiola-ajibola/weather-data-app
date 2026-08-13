@@ -164,12 +164,14 @@ export const ingestStationFile = async ({
   let saved = 0;
   let skipped = 0;
   let currentFileName = "-";
-  const progressText =
-    contentLength > 0
-      ? `\n\n${((received / contentLength) * 100).toFixed(2)}% Done`
-      : "";
+  let errorObj: Error | null = null;
 
   const logProgress = () => {
+    const progressText =
+      contentLength > 0
+        ? `\n\n${((received / contentLength) * 100).toFixed(2)}% Done` +
+          `\n${received} / ${contentLength}`
+        : "";
     logUpdate(
       `File Name:\t${currentFileName}\n` +
         `${color.blue(`Count:\t\t${count}`)}` +
@@ -299,17 +301,27 @@ export const ingestStationFile = async ({
     );
   } catch (error) {
     console.error({ error });
+    errorObj = error as Error;
     logProgress();
   } finally {
     logUpdate.done();
+    const progressText =
+      contentLength > 0
+        ? `\n\n${((received / contentLength) * 100).toFixed(2)}% Done` +
+          `\n${received} / ${contentLength}`
+        : "";
+    const errorMessage = errorObj
+      ? `\n${errorObj.message}\n${errorObj.name}\n\n${errorObj.stack}`
+      : "";
     await mkdir("status_logs", { recursive: true });
     await writeFile(
       `status_logs/final_status_${Date.now()}.log`,
       `File Name:\t${currentFileName}\n` +
-        `${`Count:\t\t${count}`}` +
-        `\n${`Saved:\t\t${saved}`}` +
-        `\n${`Skipped:\t${skipped}`}` +
-        `\n${`Errors:\t\t${errors}\n`}`,
+        `${color.blue(`Count:\t\t${count}`)}` +
+        `\n${color.green(`Saved:\t\t${saved}`)}` +
+        `\n${color.yellow(`Skipped:\t${skipped}`)}` +
+        `\n${color.red(`Errors:\t\t${errors}`)}` +
+        progressText,
     );
   }
 };
