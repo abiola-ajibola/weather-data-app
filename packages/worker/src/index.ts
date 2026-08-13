@@ -1,5 +1,6 @@
 import { pipeline } from "node:stream/promises";
 import { createGunzip } from "node:zlib";
+import { IncomingMessage } from "node:http";
 import { extract } from "tar-stream";
 import { PipelineSource } from "node:stream";
 import logUpdate from "log-update";
@@ -148,6 +149,12 @@ export const ingestStationFile = async ({
   startDate,
   endDate,
 }: IngestArgs): Promise<void> => {
+  let received = 0;
+  let contentLength = 0;
+  if (source instanceof IncomingMessage) {
+    contentLength = Number(source.headers["content-length"]);
+  }
+
   const gunzip = createGunzip();
   const extractor = extract();
   const startTime = startDate?.getTime();
@@ -164,7 +171,10 @@ export const ingestStationFile = async ({
         `${color.blue(`Count:\t\t${count}`)}` +
         `\n${color.green(`Saved:\t\t${saved}`)}` +
         `\n${color.yellow(`Skipped:\t${skipped}`)}` +
-        `\n${color.red(`Errors:\t\t${errors}\n`)}`,
+        `\n${color.red(`Errors:\t\t${errors}\n`)}` +
+        contentLength
+        ? `\n${(received / contentLength).toFixed(2)}%`
+        : "",
     );
   };
 
@@ -273,7 +283,18 @@ export const ingestStationFile = async ({
   });
 
   try {
-    await pipeline(source, gunzip, extractor);
+    await pipeline(
+      source,
+      async function* (source: AsyncIterable<Buffer>) {
+        for await (const chunk of source) {
+          received += chunk.length;
+          logProgress();
+          yield chunk;
+        }
+      },
+      gunzip,
+      extractor,
+    );
   } catch (error) {
     console.error({ error });
     logProgress();
