@@ -164,6 +164,10 @@ export const ingestStationFile = async ({
   let saved = 0;
   let skipped = 0;
   let currentFileName = "-";
+  const progressText =
+    contentLength > 0
+      ? `\n\n${((received / contentLength) * 100).toFixed(2)}% Done`
+      : "";
 
   const logProgress = () => {
     logUpdate(
@@ -171,10 +175,8 @@ export const ingestStationFile = async ({
         `${color.blue(`Count:\t\t${count}`)}` +
         `\n${color.green(`Saved:\t\t${saved}`)}` +
         `\n${color.yellow(`Skipped:\t${skipped}`)}` +
-        `\n${color.red(`Errors:\t\t${errors}\n`)}` +
-        contentLength
-        ? `\n${(received / contentLength).toFixed(2)}%`
-        : "",
+        `\n${color.red(`Errors:\t\t${errors}`)}` +
+        progressText,
     );
   };
 
