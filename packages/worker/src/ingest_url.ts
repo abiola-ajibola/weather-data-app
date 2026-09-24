@@ -21,7 +21,7 @@ async function ingestUrl() {
       );
     });
 
-    ingestStationFile({
+    await ingestStationFile({
       source: response,
       startDate: new Date("2026-05-03"),
       endDate: new Date(""),

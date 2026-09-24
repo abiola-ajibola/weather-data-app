@@ -185,12 +185,10 @@ export const ingestStationFile = async ({
 
   gunzip.on("error", (error) => {
     console.log({ gunzipError: error });
-    throw error;
   });
 
   extractor.on("error", (error) => {
     console.log({ extractorError: error });
-    throw error;
   });
 
   async function* iterateEntries(extractor: Extract) {
