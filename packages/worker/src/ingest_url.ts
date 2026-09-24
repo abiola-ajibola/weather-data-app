@@ -21,6 +21,14 @@ async function ingestUrl() {
       );
     });
 
+    response.on("error", (err) => {
+      console.log({responseError: err})
+    })
+
+    response.on("aborted", (err) => {
+      console.log({responseErrorAb: err})
+    })
+
     await ingestStationFile({
       source: response,
       startDate: new Date("2026-05-03"),
