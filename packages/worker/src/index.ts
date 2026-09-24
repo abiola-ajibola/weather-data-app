@@ -183,6 +183,16 @@ export const ingestStationFile = async ({
     );
   };
 
+  gunzip.on("error", (error) => {
+    console.log({ gunzipError: error });
+    throw error;
+  });
+
+  extractor.on("error", (error) => {
+    console.log({ extractorError: error });
+    throw error;
+  });
+
   async function* iterateEntries(extractor: Extract) {
     for await (const chunk of extractor) {
       yield { headers: chunk.header, stream: chunk };
@@ -272,11 +282,11 @@ export const ingestStationFile = async ({
 
               if (!!observation) {
                 saved += 1;
-                logProgress()
+                logProgress();
               }
             } else {
               skipped += 1;
-              logProgress()
+              logProgress();
             }
           } catch (e) {
             console.error(e);
