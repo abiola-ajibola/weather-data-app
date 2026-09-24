@@ -7,7 +7,7 @@ import { PipelineSource } from "node:stream";
 import logUpdate from "log-update";
 import color from "yoctocolors";
 
-import { prisma } from "@weather-data-app/database";
+import { prisma, WeatherStation } from "@weather-data-app/database";
 import { parse } from "csv-parse";
 
 import iso_codes from "./lib/ISO-codes-table.json" with { type: "json" };
@@ -254,23 +254,23 @@ export const ingestStationFile = async ({
                 where: { stationId: station.stationId },
               });
 
-              if (!existingStation) {
-                await prisma.weatherStation.create({
-                  data: station,
-                });
-              } else {
-                await prisma.weatherObservation.upsert({
-                  where: {
-                    stationId_date: {
-                      stationId: station.stationId,
-                      date: data.date,
-                    },
+              const newStation = !!existingStation
+                ? null
+                : await prisma.weatherStation.create({
+                    data: station,
+                  });
+              const observation = await prisma.weatherObservation.upsert({
+                where: {
+                  stationId_date: {
+                    stationId: newStation?.stationId || station.stationId,
+                    date: data.date,
                   },
-                  create: data,
-                  update: data,
-                });
-              }
-              saved += 1;
+                },
+                create: data,
+                update: data,
+              });
+
+              if (!!observation) saved += 1;
             } else {
               skipped += 1;
             }
