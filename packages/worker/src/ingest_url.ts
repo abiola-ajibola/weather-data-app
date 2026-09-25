@@ -3,6 +3,7 @@ import { IncomingMessage } from "node:http";
 
 import { prisma } from "@weather-data-app/database";
 import { ingestStationFile } from "./index.js";
+import { TempFileDuplexStream } from "./lib/tempFileDuplexStream.js";
 
 async function ingestUrl() {
   try {
@@ -22,15 +23,19 @@ async function ingestUrl() {
     });
 
     response.on("error", (err) => {
-      console.log({responseError: err})
-    })
+      console.log({ responseError: err });
+    });
 
     response.on("aborted", (err) => {
-      console.log({responseErrorAb: err})
-    })
+      console.log({ responseErrorAb: err });
+    });
+    const tempFileSream = new TempFileDuplexStream(
+      Number(response.headers["content-length"]),
+    );
+    response.pipe(tempFileSream);
 
     await ingestStationFile({
-      source: response,
+      source: tempFileSream,
       startDate: new Date("2026-05-03"),
       endDate: new Date(""),
     });
