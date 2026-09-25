@@ -1,12 +1,13 @@
 import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
 import { createGunzip } from "node:zlib";
 import { IncomingMessage } from "node:http";
-import { extract } from "tar-stream";
+import { extract, type Extract, type Headers } from "tar-stream";
 import { PipelineSource } from "node:stream";
 import logUpdate from "log-update";
 import color from "yoctocolors";
 
-import { prisma } from "@weather-data-app/database";
+import { prisma, WeatherStation } from "@weather-data-app/database";
 import { parse } from "csv-parse";
 
 import iso_codes from "./lib/ISO-codes-table.json" with { type: "json" };
@@ -182,123 +183,139 @@ export const ingestStationFile = async ({
     );
   };
 
-  extractor.on("entry", async (headers, stream, next) => {
-    count += 1;
-    currentFileName = headers.name;
-    logProgress();
-    const parser = parse({
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-      autoParse: true,
-    });
+  gunzip.on("error", (error) => {
+    console.log({ gunzipError: error });
+  });
 
-    parser.on("data", async (row: CsvRow) => {
+  extractor.on("error", (error) => {
+    console.log({ extractorError: error });
+  });
+
+  async function* iterateEntries(extractor: Extract) {
+    for await (const chunk of extractor) {
+      yield { headers: chunk.header, stream: chunk };
+    }
+  }
+
+  const processEntries = async () => {
+    for await (const { headers, stream } of iterateEntries(extractor)) {
+      count += 1;
+      currentFileName = headers.name;
+      logProgress();
+
+      const parser = stream.pipe(
+        parse({
+          columns: true,
+          skip_empty_lines: true,
+          trim: true,
+          autoParse: true,
+        }),
+      );
+
       try {
-        parser.pause();
-        const time = row.DATE ? new Date(row.DATE).getTime() : 0;
-        if (time >= (startTime || 0) && time <= (endTime || Infinity)) {
-          const stationId = row.STATION?.trim() || "";
-          const stationName = row.NAME?.trim() || "";
-          const station: StationPayload = {
-            stationId,
-            name: stationName,
-            regionCode: extractRegionCode(stationName),
-            latitude: toNumber(row.LATITUDE),
-            longitude: toNumber(row.LONGITUDE),
-            elevationM: toNumber(row.ELEVATION),
-          };
-          const data: ObservationPayload = {
-            stationId,
-            stationName,
-            date: toDate(row.DATE),
-            latitude: toNumber(row.LATITUDE),
-            longitude: toNumber(row.LONGITUDE),
-            elevationM: toNumber(row.ELEVATION),
-            prcp: toScaledNumber(row.PRCP),
-            prcpAttributes: toAttribute(row.PRCP_ATTRIBUTES),
-            tavg: toScaledNumber(row.TAVG),
-            tavgAttributes: toAttribute(row.TAVG_ATTRIBUTES),
-            tmax: toScaledNumber(row.TMAX),
-            tmaxAttributes: toAttribute(row.TMAX_ATTRIBUTES),
-            tmin: toScaledNumber(row.TMIN),
-            tminAttributes: toAttribute(row.TMIN_ATTRIBUTES),
-            dapr: toInteger(row.DAPR),
-            daprAttributes: toAttribute(row.DAPR_ATTRIBUTES),
-            datn: toScaledNumber(row.DATN),
-            datnAttributes: toAttribute(row.DATN_ATTRIBUTES),
-            datx: toScaledNumber(row.DATX),
-            datxAttributes: toAttribute(row.DATX_ATTRIBUTES),
-            dwpr: toInteger(row.DWPR),
-            dwprAttributes: toAttribute(row.DWPR_ATTRIBUTES),
-            mdpr: toScaledNumber(row.MDPR),
-            mdprAttributes: toAttribute(row.MDPR_ATTRIBUTES),
-            mdtn: toScaledNumber(row.MDTN),
-            mdtnAttributes: toAttribute(row.MDTN_ATTRIBUTES),
-            mdtx: toScaledNumber(row.MDTX),
-            mdtxAttributes: toAttribute(row.MDTX_ATTRIBUTES),
-          };
+        for await (const row of parser as AsyncIterable<CsvRow>) {
+          try {
+            const time = row.DATE ? new Date(row.DATE).getTime() : 0;
+            if (time >= (startTime || 0) && time <= (endTime || Infinity)) {
+              const stationId = row.STATION?.trim() || "";
+              const stationName = row.NAME?.trim() || "";
+              const station: StationPayload = {
+                stationId,
+                name: stationName,
+                regionCode: extractRegionCode(stationName),
+                latitude: toNumber(row.LATITUDE),
+                longitude: toNumber(row.LONGITUDE),
+                elevationM: toNumber(row.ELEVATION),
+              };
+              const data: ObservationPayload = {
+                stationId,
+                stationName,
+                date: toDate(row.DATE),
+                latitude: toNumber(row.LATITUDE),
+                longitude: toNumber(row.LONGITUDE),
+                elevationM: toNumber(row.ELEVATION),
+                prcp: toScaledNumber(row.PRCP),
+                prcpAttributes: toAttribute(row.PRCP_ATTRIBUTES),
+                tavg: toScaledNumber(row.TAVG),
+                tavgAttributes: toAttribute(row.TAVG_ATTRIBUTES),
+                tmax: toScaledNumber(row.TMAX),
+                tmaxAttributes: toAttribute(row.TMAX_ATTRIBUTES),
+                tmin: toScaledNumber(row.TMIN),
+                tminAttributes: toAttribute(row.TMIN_ATTRIBUTES),
+                dapr: toInteger(row.DAPR),
+                daprAttributes: toAttribute(row.DAPR_ATTRIBUTES),
+                datn: toScaledNumber(row.DATN),
+                datnAttributes: toAttribute(row.DATN_ATTRIBUTES),
+                datx: toScaledNumber(row.DATX),
+                datxAttributes: toAttribute(row.DATX_ATTRIBUTES),
+                dwpr: toInteger(row.DWPR),
+                dwprAttributes: toAttribute(row.DWPR_ATTRIBUTES),
+                mdpr: toScaledNumber(row.MDPR),
+                mdprAttributes: toAttribute(row.MDPR_ATTRIBUTES),
+                mdtn: toScaledNumber(row.MDTN),
+                mdtnAttributes: toAttribute(row.MDTN_ATTRIBUTES),
+                mdtx: toScaledNumber(row.MDTX),
+                mdtxAttributes: toAttribute(row.MDTX_ATTRIBUTES),
+              };
 
-          const existingStation = await prisma.weatherStation.findUnique({
-            where: { stationId: station.stationId },
-          });
+              const existingStation = await prisma.weatherStation.findUnique({
+                where: { stationId: station.stationId },
+              });
 
-          if (!existingStation) {
-            const created = await prisma.weatherStation.create({
-              data: station,
-            });
-            if (created) parser.resume();
-          } else {
-            const updated = await prisma.weatherObservation.upsert({
-              where: {
-                stationId_date: {
-                  stationId: station.stationId,
-                  date: data.date,
+              const newStation = !!existingStation
+                ? null
+                : await prisma.weatherStation.create({
+                    data: station,
+                  });
+              const observation = await prisma.weatherObservation.upsert({
+                where: {
+                  stationId_date: {
+                    stationId: newStation?.stationId || station.stationId,
+                    date: data.date,
+                  },
                 },
-              },
-              create: data,
-              update: data,
-            });
-            if (updated) parser.resume();
+                create: data,
+                update: data,
+              });
+
+              if (!!observation) {
+                saved += 1;
+                logProgress();
+              }
+            } else {
+              skipped += 1;
+              logProgress();
+            }
+          } catch (e) {
+            console.error(e);
+            errors += 1;
+            logProgress();
           }
-          saved += 1;
-        } else {
-          skipped += 1;
         }
-      } catch (e) {
-        console.error(e);
+      } catch (err) {
+        console.error({ err });
         errors += 1;
         logProgress();
       }
-    });
-
-    parser.on("error", function (err) {
-      console.error({ err });
-      errors += 1;
-      logProgress();
-    });
-    stream.on("error", (err) => next(err));
-    stream.on("data", async (chunk: Buffer) => {
-      parser.write(chunk);
-    });
-    stream.on("end", () => {
-      next();
-    });
-  });
+    }
+  };
 
   try {
-    await pipeline(
-      source,
-      async function* (source: AsyncIterable<Buffer>) {
-        for await (const chunk of source) {
-          received += chunk.length;
-          logProgress();
-          yield chunk;
-        }
-      },
-      gunzip,
-      extractor,
-    );
+    await Promise.all([
+      pipeline(
+        source,
+        async function* (source: AsyncIterable<Buffer>) {
+          for await (const chunk of source) {
+            received += chunk.length;
+            logProgress();
+            yield chunk;
+          }
+        },
+        gunzip,
+        extractor,
+      ),
+      processEntries(),
+    ]);
   } catch (error) {
     console.error({ error });
     errorObj = error as Error;

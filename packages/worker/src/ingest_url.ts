@@ -3,28 +3,46 @@ import { IncomingMessage } from "node:http";
 
 import { prisma } from "@weather-data-app/database";
 import { ingestStationFile } from "./index.js";
+import { TempFileDuplexStream } from "./lib/tempFileDuplexStream.js";
 
 async function ingestUrl() {
-  const response = await new Promise<IncomingMessage>((resolve, reject) => {
-    get(
-      new URL(
-        "https://www.ncei.noaa.gov/data/daily-summaries/archive/daily-summaries-latest.tar.gz",
-      ),
-      {
-        method: "GET",
-      },
-      (res) => {
-        res.on("error", reject);
-        resolve(res);
-      },
-    );
-  });
+  try {
+    const response = await new Promise<IncomingMessage>((resolve, reject) => {
+      get(
+        new URL(
+          "https://www.ncei.noaa.gov/data/daily-summaries/archive/daily-summaries-latest.tar.gz",
+        ),
+        {
+          method: "GET",
+        },
+        (res) => {
+          res.on("error", reject);
+          resolve(res);
+        },
+      );
+    });
 
-  ingestStationFile({
-    source: response,
-    startDate: new Date("2026-05-03"),
-    endDate: new Date(""),
-  });
+    response.on("error", (err) => {
+      console.log({ responseError: err });
+    });
+
+    response.on("aborted", (err) => {
+      console.log({ responseErrorAb: err });
+    });
+    const tempFileSream = new TempFileDuplexStream(
+      Number(response.headers["content-length"]),
+    );
+    response.pipe(tempFileSream);
+
+    await ingestStationFile({
+      source: tempFileSream,
+      startDate: new Date("2026-05-03"),
+      endDate: new Date(""),
+    });
+  } catch (error) {
+    console.error("Injest URL Error");
+    console.error(error);
+  }
 }
 
 ingestUrl()
