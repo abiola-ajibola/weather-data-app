@@ -28,20 +28,6 @@ export class TempFileDuplexStream extends Duplex {
         callback(err);
       }
       this.#fd = fd;
-      process.on("SIGTERM", (signal) => {
-        console.log({ signal });
-        process.exit(signal.length);
-      });
-      process.on("SIGKILL", (signal) => {
-        console.log({ signal });
-        process.exit(signal.length);
-      });
-      process.on("exit", (code) => {
-        console.log("EXHI:", code);
-      });
-      process.on("beforeExit", (code) => {
-        console.log("EXHIBefore:", code);
-      });
       console.log({ fd });
       console.log({ tempFile: this.#tempFilePath });
       callback();
