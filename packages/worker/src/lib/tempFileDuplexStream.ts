@@ -9,9 +9,9 @@ export class TempFileDuplexStream extends Duplex {
   #bytesRead: number;
   #bytesWritten: number;
   #fd: number | null = null;
-  #totalBytes: number;
+  #writeFinished = false;
 
-  constructor(contentLength: number, options?: DuplexOptions) {
+  constructor( options?: DuplexOptions) {
     super(options);
     this.#tempFilePath = join(
       tmpdir(),
@@ -19,7 +19,6 @@ export class TempFileDuplexStream extends Duplex {
     );
     this.#bytesRead = 0;
     this.#bytesWritten = 0;
-    this.#totalBytes = contentLength;
   }
 
   _construct(callback: (error?: Error | null) => void): void {
@@ -86,7 +85,7 @@ export class TempFileDuplexStream extends Duplex {
       } else {
         this.push("");
       }
-      if (this.#bytesRead >= this.#totalBytes) {
+      if (this.#writeFinished && this.#bytesRead >= this.#bytesWritten) {
         // Pushing null signals the end of the readable stream (EOF)
         this.push(null);
       }
@@ -94,7 +93,7 @@ export class TempFileDuplexStream extends Duplex {
   }
 
   _final(callback: (error?: Error | null) => void): void {
-    this.destroy()
+    this.#writeFinished = true;
     callback();
   }
 

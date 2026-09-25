@@ -29,9 +29,7 @@ async function ingestUrl() {
     response.on("aborted", (err) => {
       console.log({ responseErrorAb: err });
     });
-    const tempFileSream = new TempFileDuplexStream(
-      Number(response.headers["content-length"]),
-    );
+    const tempFileSream = new TempFileDuplexStream();
     response.pipe(tempFileSream);
 
     await ingestStationFile({
