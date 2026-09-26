@@ -3,6 +3,7 @@ import { close, open, read, unlink, write } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Duplex, DuplexOptions } from "node:stream";
+import { abortEmitter } from "./abortEventEmitter.js";
 
 export class TempFileDuplexStream extends Duplex {
   #tempFilePath = "";
@@ -11,7 +12,7 @@ export class TempFileDuplexStream extends Duplex {
   #fd: number | null = null;
   #writeFinished = false;
 
-  constructor( options?: DuplexOptions) {
+  constructor(options?: DuplexOptions) {
     super(options);
     this.#tempFilePath = join(
       tmpdir(),
@@ -101,6 +102,7 @@ export class TempFileDuplexStream extends Duplex {
     error: Error | null,
     callback: (error?: Error | null) => void,
   ): void {
+    abortEmitter.removeAllListeners();
     const removeFile = (cleanupError?: Error | null): void => {
       unlink(this.#tempFilePath, (unlinkError) => {
         callback(error ?? cleanupError ?? unlinkError ?? null);
