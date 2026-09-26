@@ -278,8 +278,15 @@ export const ingestStationFile = async ({
                 update: data,
               });
 
-              if (!!observation) {
+              if (
+                observation.updatedAt.getTime() -
+                  observation.createdAt.getTime() <=
+                50
+              ) {
                 saved += 1;
+                logProgress();
+              } else {
+                skipped += 1;
                 logProgress();
               }
             } else {
