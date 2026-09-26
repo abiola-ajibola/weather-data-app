@@ -9,7 +9,7 @@ import { abortEmitter } from "./lib/abortEventEmitter.js";
 const fetchFile = async (offset = 0) => {
   let recieved = 0;
   const res = await new Promise<IncomingMessage>((resolve, reject) => {
-    get(
+    const request = get(
       new URL(
         "https://www.ncei.noaa.gov/data/daily-summaries/archive/daily-summaries-latest.tar.gz",
       ),
@@ -24,6 +24,12 @@ const fetchFile = async (offset = 0) => {
         resolve(res);
       },
     );
+    request.on("abort", (error) => {
+      console.log({ requestAbort: error });
+    });
+    request.on("error", (err) => {
+      console.log({ requestErr: err });
+    });
   });
   res.on("error", (err) => {
     console.log({ responseError: err });
